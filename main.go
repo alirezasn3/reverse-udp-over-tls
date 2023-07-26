@@ -149,7 +149,6 @@ func init() {
 	}
 }
 
-// wvxbSIBJ2086
 func main() {
 	if config.Role == "server" {
 		// create negotiation endpoint
