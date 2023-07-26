@@ -25,27 +25,20 @@ type Config struct {
 	UDPListen           string `json:"udpListen"`
 	CertificateLocation string `json:"certificateLocation"`
 	KeyLocation         string `json:"keyLocation"`
-	Negotiator          string `json:"negotiator"`
 	TLSConfig           tls.Config
 }
 
-func createConnectionToClient(clientAddress string) {
+func createConnectionToClient() {
 	// connect to client
-	connectionToClient, err := tls.Dial("tcp", clientAddress, &config.TLSConfig)
+	connectionToClient, err := tls.Dial("tcp", config.TCPConnect, &config.TLSConfig)
 	if err != nil {
-		panic(fmt.Sprintf("failed to connect to client at %s\n%s\n", clientAddress, err.Error()))
+		panic(fmt.Sprintf("failed to connect to client at %s\n%s\n", config.TCPConnect, err.Error()))
 	}
 
 	// initialize connection
-	_, err = connectionToClient.Write([]byte(fmt.Sprintf("GET / HTTP/1.1\r\nHost: %s\r\nContent-Length: %d\r\nContent-Type: text/plain\r\n\r\n%s", clientAddress, len(config.Secret), config.Secret)))
+	_, err = connectionToClient.Write([]byte(fmt.Sprintf("GET / HTTP/1.1\r\nHost: %s\r\nContent-Length: %d\r\nContent-Type: text/plain\r\n\r\n%s", config.TCPConnect, len(config.Secret), config.Secret)))
 	if err != nil {
-		panic(fmt.Sprintf("failed to send raw http request to client at %s\n%s\n", clientAddress, err.Error()))
-	}
-
-	// parse local service address
-	localServiceAddress, err := net.ResolveUDPAddr("udp4", config.UDPConnect)
-	if err != nil {
-		panic(fmt.Sprintf("failed to parse local service address %s\n%s\n", config.UDPConnect, err.Error()))
+		panic(fmt.Sprintf("failed to send raw http request to client at %s\n%s\n", config.TCPConnect, err.Error()))
 	}
 
 	// read first packet from client
@@ -56,6 +49,12 @@ func createConnectionToClient(clientAddress string) {
 	}
 	if string(buffer[:readBytes]) != "ok" {
 		panic("did not receive ok packet from client")
+	}
+
+	// parse local service address
+	localServiceAddress, err := net.ResolveUDPAddr("udp4", config.UDPConnect)
+	if err != nil {
+		panic(fmt.Sprintf("failed to parse local service address %s\n%s\n", config.UDPConnect, err.Error()))
 	}
 
 	// create connection serivce
@@ -109,7 +108,7 @@ func createConnectionToClient(clientAddress string) {
 			// write packet to client
 			_, e = connectionToClient.Write(b[:n])
 			if e != nil {
-				fmt.Printf("failed to write packet to %s\n%s\n", clientAddress, e.Error())
+				fmt.Printf("failed to write packet to %s\n%s\n", config.TCPConnect, e.Error())
 				wg.Done()
 				wg.Done()
 			}
@@ -151,40 +150,50 @@ func init() {
 
 func main() {
 	if config.Role == "server" {
-		// create negotiation endpoint
-		if err := http.ListenAndServe("0.0.0.0:80",
-			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				// check if secret header is valid
-				if r.Header.Get("secret") != config.Secret {
-					w.WriteHeader(400)
-					return
-				}
+		// create master conncetion
+		masterConnectionToClient, err := tls.Dial("tcp", config.TCPConnect, &config.TLSConfig)
+		if err != nil {
+			panic(fmt.Sprintf("failed to connect to client at %s\n%s\n", config.TCPConnect, err.Error()))
+		}
 
-				// read body
-				defer r.Body.Close()
-				body, err := io.ReadAll(r.Body)
-				if err != nil {
-					w.WriteHeader(400)
-					return
-				}
+		// initialize connection
+		_, err = masterConnectionToClient.Write([]byte(fmt.Sprintf("GET / HTTP/1.1\r\nHost: %s\r\nContent-Length: %d\r\nContent-Type: text/plain\r\n\r\n%s", config.TCPConnect, len(config.Secret), config.Secret)))
+		if err != nil {
+			panic(fmt.Sprintf("failed to send raw http request to client at %s\n%s\n", config.TCPConnect, err.Error()))
+		}
 
-				// check if body is a valid address
-				if net.ParseIP(string(body)) == nil {
-					w.WriteHeader(400)
-					return
-				}
+		// read first packet from client
+		buffer := make([]byte, 1024*8)
+		readBytes, err := masterConnectionToClient.Read(buffer)
+		if err != nil {
+			panic(fmt.Sprintf("failed to read first packet from client\n%s\n", err.Error()))
+		}
+		if string(buffer[:readBytes]) != "ok" {
+			panic("did not receive ok packet from client")
+		}
+		fmt.Println("created master connection to client")
 
-				w.WriteHeader(200)
+		b := make([]byte, 1024*8)
+		var n int
+		var e error
+		for {
+			// read from master connection to client
+			n, e = masterConnectionToClient.Read(b)
+			if e != nil {
+				panic(e)
+			}
 
-				go createConnectionToClient(string(body))
-			}),
-		); err != nil {
-			panic(err)
+			// check for commands
+			if string(b[:n]) == "0" { // create new connection to client
+				fmt.Println("creating new connection to client")
+				go createConnectionToClient()
+			}
 		}
 	} else {
 		var pool []*net.Conn
 		var waitList []string
 		userAddressToConnectionTable := make(map[string]*net.Conn)
+		var masterConnectionToServer *net.Conn = nil
 
 		go func() {
 			// create local listener
@@ -218,19 +227,10 @@ func main() {
 
 				if connectionToServer, ok = userAddressToConnectionTable[userAddress.String()]; !ok {
 					go func() {
-						client := &http.Client{}
-						req, err := http.NewRequest("GET", config.Negotiator, nil)
-						if err != nil {
-							panic(err)
-						}
-						req.Header.Set("secret", config.Secret)
-						res, err := client.Do(req)
-						if err != nil {
-							panic(err)
-						}
-						fmt.Println(res.StatusCode)
+						(*masterConnectionToServer).Write([]byte("0"))
 					}()
 					go func() {
+
 						waitList = append(waitList, userAddress.String())
 						fmt.Println("waiting for connection from server")
 						for len(pool) < 1 {
@@ -303,8 +303,14 @@ func main() {
 						return
 					}
 
-					// add stablished connection to the pool
-					pool = append(pool, &connectionToServer)
+					if masterConnectionToServer == nil {
+						// use the first connection as the master connection
+						masterConnectionToServer = &connectionToServer
+						fmt.Println("master connection to server stablished")
+					} else {
+						// add stablished connection to the pool
+						pool = append(pool, &connectionToServer)
+					}
 				} else {
 					w.WriteHeader(200)
 					w.Write([]byte("Hello World!"))
