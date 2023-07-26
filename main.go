@@ -178,8 +178,8 @@ func main() {
 			}
 		}
 	} else {
-		pool := make(chan *net.Conn, 1024)
-		userAddressToConnectionTable := make(map[string]*net.Conn)
+		pool := make(chan net.Conn, 1024)
+		userAddressToConnectionTable := make(map[string]net.Conn)
 		var masterConnectionToServer *net.Conn = nil
 
 		go func() {
@@ -200,7 +200,7 @@ func main() {
 			var n int
 			var e error
 			var ok bool
-			var connectionToServer *net.Conn
+			var connectionToServer net.Conn
 			var userAddress *net.UDPAddr
 			for {
 				n, userAddress, e = localListener.ReadFromUDP(b)
@@ -209,7 +209,7 @@ func main() {
 				}
 
 				if connectionToServer, ok = userAddressToConnectionTable[userAddress.String()]; ok {
-					_, e = (*connectionToServer).Write(b[:n])
+					_, e = connectionToServer.Write(b[:n])
 					if e != nil {
 						fmt.Printf("failed to write packet to server\n%s\n", e.Error())
 					}
@@ -225,7 +225,7 @@ func main() {
 							var num int
 							var error error
 							for {
-								num, error = (*connectionToServer).Read(buff)
+								num, error = connectionToServer.Read(buff)
 								if error != nil {
 									fmt.Printf("failed to read packet from server\n%s\n", error.Error())
 									break
@@ -237,7 +237,7 @@ func main() {
 								}
 							}
 						}(userAddress)
-						_, e = (*connectionToServer).Write(buff)
+						_, e = connectionToServer.Write(buff)
 						if e != nil {
 							fmt.Printf("failed to write packet to server\n%s\n", e.Error())
 							return
@@ -281,7 +281,7 @@ func main() {
 						fmt.Println("master connection to server stablished")
 					} else {
 						// add stablished connection to the pool
-						pool <- &connectionToServer
+						pool <- connectionToServer
 					}
 				} else {
 					w.WriteHeader(200)
