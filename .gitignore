@@ -1,3 +1,4 @@
 /certs
 config.json
 *.exe
+node_modules
