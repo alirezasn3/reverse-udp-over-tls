@@ -149,6 +149,7 @@ func init() {
 	}
 }
 
+// wvxbSIBJ2086
 func main() {
 	if config.Role == "server" {
 		// create negotiation endpoint
@@ -259,6 +260,7 @@ func main() {
 						i := slices.Index(waitList, userAddress.String())
 						waitList = append(waitList[:i], waitList[i+1:]...)
 					}()
+					continue
 				}
 
 				_, e = (*connectionToServer).Write(b[:n])
