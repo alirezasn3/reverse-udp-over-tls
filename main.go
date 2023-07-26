@@ -8,8 +8,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-
-	"golang.org/x/exp/slices"
 )
 
 var config Config
@@ -181,7 +179,6 @@ func main() {
 		}
 	} else {
 		pool := make(chan *net.Conn, 1024)
-		var waitList []string
 		userAddressToConnectionTable := make(map[string]*net.Conn)
 		var masterConnectionToServer *net.Conn = nil
 
@@ -211,17 +208,15 @@ func main() {
 					fmt.Printf("failed to read packet from user\n%s\n", e.Error())
 				}
 
-				if slices.Contains(waitList, userAddress.String()) {
-					continue
-				}
-
-				if connectionToServer, ok = userAddressToConnectionTable[userAddress.String()]; !ok {
-					waitList = append(waitList, userAddress.String())
-					go func() {
-						(*masterConnectionToServer).Write([]byte("0"))
-					}()
-					go func() {
+				if connectionToServer, ok = userAddressToConnectionTable[userAddress.String()]; ok {
+					_, e = (*connectionToServer).Write(b[:n])
+					if e != nil {
+						fmt.Printf("failed to write packet to server\n%s\n", e.Error())
+					}
+				} else {
+					go func(buff []byte) {
 						fmt.Println("waiting for connection from server")
+						(*masterConnectionToServer).Write([]byte("0"))
 						connectionToServer = <-pool
 						fmt.Println("assigning connection to user")
 						userAddressToConnectionTable[userAddress.String()] = connectionToServer
@@ -242,20 +237,12 @@ func main() {
 								}
 							}
 						}(userAddress)
-						_, e = (*connectionToServer).Write(b[:n])
+						_, e = (*connectionToServer).Write(buff)
 						if e != nil {
 							fmt.Printf("failed to write packet to server\n%s\n", e.Error())
 							return
 						}
-						i := slices.Index(waitList, userAddress.String())
-						waitList = append(waitList[:i], waitList[i+1:]...)
-					}()
-					continue
-				}
-
-				_, e = (*connectionToServer).Write(b[:n])
-				if e != nil {
-					fmt.Printf("failed to write packet to server\n%s\n", e.Error())
+					}(b[:n])
 				}
 			}
 		}()
