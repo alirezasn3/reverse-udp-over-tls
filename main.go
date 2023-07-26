@@ -218,7 +218,13 @@ func main() {
 
 				if connectionToServer, ok = userAddressToConnectionTable[userAddress.String()]; !ok {
 					go func() {
-						res, err := http.Get(config.Negotiator)
+						client := &http.Client{}
+						req, err := http.NewRequest("GET", config.Negotiator, nil)
+						if err != nil {
+							panic(err)
+						}
+						req.Header.Set("secret", config.Secret)
+						res, err := client.Do(req)
 						if err != nil {
 							panic(err)
 						}
