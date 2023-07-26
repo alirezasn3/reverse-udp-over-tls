@@ -31,35 +31,41 @@ func createConnectionToClient() {
 	// connect to client
 	connectionToClient, err := tls.Dial("tcp", config.TCPConnect, &config.TLSConfig)
 	if err != nil {
-		panic(fmt.Sprintf("failed to connect to client at %s\n%s\n", config.TCPConnect, err.Error()))
+		fmt.Printf("failed to connect to client at %s\n%s\n", config.TCPConnect, err.Error())
+		return
 	}
 
 	// initialize connection
 	_, err = connectionToClient.Write([]byte(fmt.Sprintf("GET / HTTP/1.1\r\nHost: %s\r\nContent-Length: %d\r\nContent-Type: text/plain\r\n\r\n%s", config.TCPConnect, len(config.Secret), config.Secret)))
 	if err != nil {
-		panic(fmt.Sprintf("failed to send raw http request to client at %s\n%s\n", config.TCPConnect, err.Error()))
+		fmt.Printf("failed to send raw http request to client at %s\n%s\n", config.TCPConnect, err.Error())
+		return
 	}
 
 	// read first packet from client
 	buffer := make([]byte, 1024*8)
 	readBytes, err := connectionToClient.Read(buffer)
 	if err != nil {
-		panic(fmt.Sprintf("failed to read first packet from client\n%s\n", err.Error()))
+		fmt.Printf("failed to read first packet from client\n%s\n", err.Error())
+		return
 	}
 	if string(buffer[:readBytes]) != "ok" {
-		panic("did not receive ok packet from client")
+		fmt.Printf("did not receive ok packet from client")
+		return
 	}
 
 	// parse local service address
 	localServiceAddress, err := net.ResolveUDPAddr("udp4", config.UDPConnect)
 	if err != nil {
-		panic(fmt.Sprintf("failed to parse local service address %s\n%s\n", config.UDPConnect, err.Error()))
+		fmt.Printf("failed to parse local service address %s\n%s\n", config.UDPConnect, err.Error())
+		return
 	}
 
 	// create connection serivce
 	connectionToLocalService, err := net.DialUDP("udp4", nil, localServiceAddress)
 	if err != nil {
-		panic(fmt.Sprintf("failed to open udp connection to %s\n%s\n", config.UDPConnect, err.Error()))
+		fmt.Printf("failed to open udp connection to %s\n%s\n", config.UDPConnect, err.Error())
+		return
 	}
 
 	// handle incoming packets from client
