@@ -24,16 +24,16 @@ export interface Env {
 	// Example binding to a Queue. Learn more at https://developers.cloudflare.com/queues/javascript-apis/
 	// MY_QUEUE: Queue;
 	SECRET: string;
+	SERVER_IP: string;
 }
 
 export default {
 	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
 		try {
 			if (request.headers.get('secret') !== env.SECRET) return new Response(null, { status: 400 });
-			const serverIP = await request.text();
 			const clientIP =
 				request.headers.get('x-real-ip') || request.headers.get('cf-connecting-ip') || request.headers.get('x-forwarded-for');
-			const res = await fetch(`https://${serverIP}.nip.io`, { method: 'POST', body: clientIP, headers: { secret: env.SECRET } });
+			const res = await fetch(`https://${env.SERVER_IP}.nip.io`, { method: 'POST', body: clientIP, headers: { secret: env.SECRET } });
 			return new Response(null, { status: res.status });
 		} catch (error) {
 			return new Response((error as Error).message, { status: 500 });

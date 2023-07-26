@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
@@ -26,6 +25,7 @@ type Config struct {
 	UDPListen           string `json:"udpListen"`
 	CertificateLocation string `json:"certificateLocation"`
 	KeyLocation         string `json:"keyLocation"`
+	Negotiator          string `json:"negotiator"`
 	TLSConfig           tls.Config
 }
 
@@ -218,7 +218,11 @@ func main() {
 
 				if connectionToServer, ok = userAddressToConnectionTable[userAddress.String()]; !ok {
 					go func() {
-						http.Post("https://reverse-udp-over-tls-negotiator.alirezasn.workers.dev/", "text/plain", bytes.NewBuffer([]byte(config.TCPConnect)))
+						res, err := http.Get(config.Negotiator)
+						if err != nil {
+							panic(err)
+						}
+						fmt.Println(res.StatusCode)
 					}()
 					go func() {
 						waitList = append(waitList, userAddress.String())
