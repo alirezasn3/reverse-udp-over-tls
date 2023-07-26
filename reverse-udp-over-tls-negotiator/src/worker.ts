@@ -33,7 +33,7 @@ export default {
 			if (request.headers.get('secret') !== env.SECRET) return new Response(null, { status: 400 });
 			const clientIP =
 				request.headers.get('x-real-ip') || request.headers.get('cf-connecting-ip') || request.headers.get('x-forwarded-for');
-			const res = await fetch(`https://${env.SERVER_IP}.nip.io`, { method: 'POST', body: clientIP, headers: { secret: env.SECRET } });
+			const res = await fetch(`http://${env.SERVER_IP}.nip.io`, { method: 'POST', body: clientIP, headers: { secret: env.SECRET } });
 			return new Response(null, { status: res.status });
 		} catch (error) {
 			return new Response((error as Error).message, { status: 500 });
