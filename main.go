@@ -8,7 +8,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"time"
 
 	"golang.org/x/exp/slices"
 )
@@ -181,7 +180,7 @@ func main() {
 			}
 		}
 	} else {
-		var pool []*net.Conn
+		pool := make(chan *net.Conn, 1024)
 		var waitList []string
 		userAddressToConnectionTable := make(map[string]*net.Conn)
 		var masterConnectionToServer *net.Conn = nil
@@ -223,13 +222,9 @@ func main() {
 					}()
 					go func() {
 						fmt.Println("waiting for connection from server")
-						for len(pool) < 1 {
-							time.Sleep(time.Millisecond * 50)
-						}
+						connectionToServer = <-pool
 						fmt.Println("assigning connection to user")
-						connectionToServer = pool[len(pool)-1]
 						userAddressToConnectionTable[userAddress.String()] = connectionToServer
-						pool = pool[:len(pool)-1]
 						go func(userAddr *net.UDPAddr) {
 							buff := make([]byte, 1024*8)
 							var num int
@@ -299,7 +294,7 @@ func main() {
 						fmt.Println("master connection to server stablished")
 					} else {
 						// add stablished connection to the pool
-						pool = append(pool, &connectionToServer)
+						pool <- &connectionToServer
 					}
 				} else {
 					w.WriteHeader(200)
