@@ -62,8 +62,6 @@ func createConnectionToClient() {
 		panic(fmt.Sprintf("failed to open udp connection to %s\n%s\n", config.UDPConnect, err.Error()))
 	}
 
-	shouldClose := false
-
 	// handle incoming packets from client
 	go func() {
 		b := make([]byte, 1024*8)
