@@ -152,7 +152,7 @@ func init() {
 func main() {
 	if config.Role == "server" {
 		// create negotiation endpoint
-		if err := http.ListenAndServeTLS(config.TCPListen, config.CertificateLocation, config.KeyLocation,
+		if err := http.ListenAndServe("0.0.0.0:80",
 			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				// check if secret header is valid
 				if r.Header.Get("secret") != config.Secret {
