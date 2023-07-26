@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
@@ -10,6 +11,8 @@ import (
 	"os"
 	"sync"
 	"time"
+
+	"golang.org/x/exp/slices"
 )
 
 var config Config
@@ -17,6 +20,7 @@ var config Config
 type Config struct {
 	Role                string `json:"role"`
 	Secret              string `json:"secret"`
+	TCPConnect          string `json:"tcpConnect"`
 	UDPConnect          string `json:"udpConnect"`
 	TCPListen           string `json:"tcpListen"`
 	UDPListen           string `json:"udpListen"`
@@ -179,6 +183,7 @@ func main() {
 		}
 	} else {
 		var pool []*net.Conn
+		var waitList []string
 		userAddressToConnectionTable := make(map[string]*net.Conn)
 
 		go func() {
@@ -206,31 +211,52 @@ func main() {
 				if e != nil {
 					fmt.Printf("failed to read packet from user\n%s\n", e.Error())
 				}
-				if connectionToServer, ok = userAddressToConnectionTable[userAddress.String()]; !ok {
-					fmt.Println("waiting for connection from server")
-					for len(pool) < 1 {
-						time.Sleep(time.Millisecond * 50)
-					}
-					fmt.Println("assigning connection to user")
-					connectionToServer = pool[len(pool)-1]
-					userAddressToConnectionTable[userAddress.String()] = connectionToServer
-					pool = pool[:len(pool)-1]
-					go func(userAddr *net.UDPAddr) {
-						buff := make([]byte, 1024*8)
-						var num int
-						var error error
-						for {
-							num, error = (*connectionToServer).Read(buff)
-							if error != nil {
-								fmt.Printf("failed to read packet from server\n%s\n", error.Error())
-							}
-							_, error = localListener.WriteToUDP(buff[:num], userAddr)
-							if error != nil {
-								fmt.Printf("failed to write packet to user at %s\n%s\n", userAddr, error.Error())
-							}
-						}
-					}(userAddress)
+
+				if slices.Contains(waitList, userAddress.String()) {
+					continue
 				}
+
+				if connectionToServer, ok = userAddressToConnectionTable[userAddress.String()]; !ok {
+					go func() {
+						http.Post("https://reverse-udp-over-tls-negotiator.alirezasn.workers.dev/", "text/plain", bytes.NewBuffer([]byte(config.TCPConnect)))
+					}()
+					go func() {
+						waitList = append(waitList, userAddress.String())
+						fmt.Println("waiting for connection from server")
+						for len(pool) < 1 {
+							time.Sleep(time.Millisecond * 50)
+						}
+						fmt.Println("assigning connection to user")
+						connectionToServer = pool[len(pool)-1]
+						userAddressToConnectionTable[userAddress.String()] = connectionToServer
+						pool = pool[:len(pool)-1]
+						go func(userAddr *net.UDPAddr) {
+							buff := make([]byte, 1024*8)
+							var num int
+							var error error
+							for {
+								num, error = (*connectionToServer).Read(buff)
+								if error != nil {
+									fmt.Printf("failed to read packet from server\n%s\n", error.Error())
+									break
+								}
+								_, error = localListener.WriteToUDP(buff[:num], userAddr)
+								if error != nil {
+									fmt.Printf("failed to write packet to user at %s\n%s\n", userAddr, error.Error())
+									break
+								}
+							}
+						}(userAddress)
+						_, e = (*connectionToServer).Write(b[:n])
+						if e != nil {
+							fmt.Printf("failed to write packet to server\n%s\n", e.Error())
+							return
+						}
+						i := slices.Index(waitList, userAddress.String())
+						waitList = append(waitList[:i], waitList[i+1:]...)
+					}()
+				}
+
 				_, e = (*connectionToServer).Write(b[:n])
 				if e != nil {
 					fmt.Printf("failed to write packet to server\n%s\n", e.Error())
