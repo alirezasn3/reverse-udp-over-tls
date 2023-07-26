@@ -8,7 +8,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"sync"
 	"time"
 
 	"golang.org/x/exp/slices"
@@ -63,11 +62,9 @@ func createConnectionToClient() {
 		panic(fmt.Sprintf("failed to open udp connection to %s\n%s\n", config.UDPConnect, err.Error()))
 	}
 
-	// create wait group to handle go routines
-	var wg sync.WaitGroup
+	shouldClose := false
 
 	// handle incoming packets from client
-	wg.Add(1)
 	go func() {
 		b := make([]byte, 1024*8)
 		var n int
@@ -77,46 +74,36 @@ func createConnectionToClient() {
 			n, e = connectionToClient.Read(b)
 			if e != nil {
 				fmt.Printf("failed to read packet from client\n%s\n", e.Error())
-				wg.Done()
-				wg.Done()
+				break
 			}
 			// write packet to local service
 			_, e = connectionToLocalService.Write(b[:n])
 			if e != nil {
 				fmt.Printf("failed to write packet to local service%s\n%s\n", config.UDPConnect, e.Error())
-				wg.Done()
-				wg.Done()
+				break
 			}
 
 		}
 	}()
 
 	// handle incoming packets from local service
-	wg.Add(1)
-	go func() {
-		b := make([]byte, 1024*8)
-		var n int
-		var e error
-		for {
-			// read packet from local service
-			n, e = connectionToLocalService.Read(b)
-			if e != nil {
-				fmt.Printf("failed to read packet from %s\n%s\n", config.UDPConnect, e.Error())
-				wg.Done()
-				wg.Done()
-			}
-			// write packet to client
-			_, e = connectionToClient.Write(b[:n])
-			if e != nil {
-				fmt.Printf("failed to write packet to %s\n%s\n", config.TCPConnect, e.Error())
-				wg.Done()
-				wg.Done()
-			}
+	b := make([]byte, 1024*8)
+	var n int
+	var e error
+	for {
+		// read packet from local service
+		n, e = connectionToLocalService.Read(b)
+		if e != nil {
+			fmt.Printf("failed to read packet from %s\n%s\n", config.UDPConnect, e.Error())
+			break
 		}
-	}()
-
-	// wait for go routines to exit
-	wg.Wait()
+		// write packet to client
+		_, e = connectionToClient.Write(b[:n])
+		if e != nil {
+			fmt.Printf("failed to write packet to %s\n%s\n", config.TCPConnect, e.Error())
+			break
+		}
+	}
 }
 
 func init() {
@@ -226,12 +213,11 @@ func main() {
 				}
 
 				if connectionToServer, ok = userAddressToConnectionTable[userAddress.String()]; !ok {
+					waitList = append(waitList, userAddress.String())
 					go func() {
 						(*masterConnectionToServer).Write([]byte("0"))
 					}()
 					go func() {
-
-						waitList = append(waitList, userAddress.String())
 						fmt.Println("waiting for connection from server")
 						for len(pool) < 1 {
 							time.Sleep(time.Millisecond * 50)
