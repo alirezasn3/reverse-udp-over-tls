@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"os"
 )
@@ -22,33 +23,33 @@ type Config struct {
 	TLSConfig           tls.Config
 }
 
-func createConnectionToClient() {
+func createConnectionToClient() (*tls.Conn, error) {
 	// connect to client
 	connectionToClient, err := tls.Dial("tcp", config.TCPConnect, &config.TLSConfig)
 	if err != nil {
-		fmt.Printf("failed to connect to client at %s\n%s\n", config.TCPConnect, err.Error())
-		return
+
+		return nil, fmt.Errorf("failed to connect to client at %s\n%s", config.TCPConnect, err.Error())
 	}
 
 	// initialize connection
 	_, err = connectionToClient.Write([]byte(config.Secret))
 	if err != nil {
-		fmt.Printf("failed to send raw http request to client at %s\n%s\n", config.TCPConnect, err.Error())
-		return
+		return nil, fmt.Errorf("failed to send raw http request to client at %s\n%s", config.TCPConnect, err.Error())
 	}
 
 	// read first packet from client
 	buffer := make([]byte, 1024*8)
 	readBytes, err := connectionToClient.Read(buffer)
 	if err != nil {
-		fmt.Printf("failed to read first packet from client\n%s\n", err.Error())
-		return
+		return nil, fmt.Errorf("failed to read first packet from client\n%s\n", err.Error())
 	}
 	if string(buffer[:readBytes]) != "ok" {
-		fmt.Printf("did not receive ok packet from client")
-		return
+		return nil, fmt.Errorf("did not receive ok packet from client")
 	}
+	return connectionToClient, nil
+}
 
+func handleConnectionToClient(connectionToClient *tls.Conn) {
 	// parse local service address
 	localServiceAddress, err := net.ResolveUDPAddr("udp4", config.UDPConnect)
 	if err != nil {
@@ -137,25 +138,9 @@ func init() {
 func main() {
 	if config.Role == "server" {
 		// create master conncetion
-		masterConnectionToClient, err := tls.Dial("tcp", config.TCPConnect, &config.TLSConfig)
+		masterConnectionToClient, err := createConnectionToClient()
 		if err != nil {
-			panic(fmt.Sprintf("failed to connect to client at %s\n%s\n", config.TCPConnect, err.Error()))
-		}
-
-		// initialize connection
-		_, err = masterConnectionToClient.Write([]byte(config.Secret))
-		if err != nil {
-			panic(fmt.Sprintf("failed to send raw http request to client at %s\n%s\n", config.TCPConnect, err.Error()))
-		}
-
-		// read first packet from client
-		buffer := make([]byte, 1024*8)
-		readBytes, err := masterConnectionToClient.Read(buffer)
-		if err != nil {
-			panic(fmt.Sprintf("failed to read first packet from client\n%s\n", err.Error()))
-		}
-		if string(buffer[:readBytes]) != "ok" {
-			panic("did not receive ok packet from client")
+			panic(err)
 		}
 		fmt.Println("created master connection to client")
 
@@ -166,13 +151,27 @@ func main() {
 			// read from master connection to client
 			n, e = masterConnectionToClient.Read(b)
 			if e != nil {
-				panic(e)
+				if e == io.EOF {
+					masterConnectionToClient, err = createConnectionToClient()
+					if err != nil {
+						fmt.Println(err)
+						continue
+					}
+				} else {
+					panic(e)
+				}
 			}
 
 			// check for commands
 			if string(b[:n]) == "0" { // create new connection to client
 				fmt.Println("creating new connection to client")
-				go createConnectionToClient()
+				go func() {
+					connectionToClient, e := createConnectionToClient()
+					if e != nil {
+						fmt.Println(e)
+					}
+					handleConnectionToClient(connectionToClient)
+				}()
 			}
 		}
 	} else {
@@ -210,6 +209,10 @@ func main() {
 				} else {
 					go func(buff []byte) {
 						fmt.Println("waiting for connection from server")
+						if masterConnectionToServer == nil {
+							fmt.Println("cant request new connection to server, master connection is closed")
+							return
+						}
 						(*masterConnectionToServer).Write([]byte("0"))
 						connectionToServer := <-pool
 						fmt.Println("assigning connection to user")
