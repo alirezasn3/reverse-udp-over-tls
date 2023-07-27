@@ -31,7 +31,7 @@ func createConnectionToClient() {
 	}
 
 	// initialize connection
-	_, err = connectionToClient.Write([]byte(fmt.Sprintf("GET / HTTP/1.1\r\nHost: %s\r\nContent-Length: %d\r\nContent-Type: text/plain\r\n\r\n%s", config.TCPConnect, len(config.Secret), config.Secret)))
+	_, err = connectionToClient.Write([]byte(config.Secret))
 	if err != nil {
 		fmt.Printf("failed to send raw http request to client at %s\n%s\n", config.TCPConnect, err.Error())
 		return
@@ -143,7 +143,7 @@ func main() {
 		}
 
 		// initialize connection
-		_, err = masterConnectionToClient.Write([]byte(fmt.Sprintf("GET / HTTP/1.1\r\nHost: %s\r\nContent-Length: %d\r\nContent-Type: text/plain\r\n\r\n%s", config.TCPConnect, len(config.Secret), config.Secret)))
+		_, err = masterConnectionToClient.Write([]byte(config.Secret))
 		if err != nil {
 			panic(fmt.Sprintf("failed to send raw http request to client at %s\n%s\n", config.TCPConnect, err.Error()))
 		}
