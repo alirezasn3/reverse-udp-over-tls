@@ -176,9 +176,9 @@ func main() {
 			}
 		}
 	} else {
-		pool := make(chan *tls.Conn, 1024)
-		userAddressToConnectionTable := make(map[string]*tls.Conn)
-		var masterConnectionToServer *tls.Conn = nil
+		pool := make(chan *net.Conn, 1024)
+		userAddressToConnectionTable := make(map[string]*net.Conn)
+		var masterConnectionToServer *net.Conn = nil
 
 		go func() {
 			// create local listener
@@ -195,28 +195,23 @@ func main() {
 
 			// handle packets from users
 			b := make([]byte, 1024*8)
-			var n int
-			var e error
-			var ok bool
-			var connectionToServer *tls.Conn
-			var userAddress *net.UDPAddr
 			for {
-				n, userAddress, e = localListener.ReadFromUDP(b)
+				n, userAddress, e := localListener.ReadFromUDP(b)
 				if e != nil {
 					fmt.Printf("failed to read packet from user\n%s\n", e.Error())
 					continue
 				}
 
-				if connectionToServer, ok = userAddressToConnectionTable[userAddress.String()]; ok {
-					_, e = connectionToServer.Write(b[:n])
+				if userAddressToConnectionTable[userAddress.String()] != nil {
+					_, e = (*userAddressToConnectionTable[userAddress.String()]).Write(b[:n])
 					if e != nil {
 						fmt.Printf("failed to write packet to server\n%s\n", e.Error())
 					}
 				} else {
 					go func(buff []byte) {
 						fmt.Println("waiting for connection from server")
-						masterConnectionToServer.Write([]byte("0"))
-						connectionToServer = <-pool
+						(*masterConnectionToServer).Write([]byte("0"))
+						connectionToServer := <-pool
 						fmt.Println("assigning connection to user")
 						userAddressToConnectionTable[userAddress.String()] = connectionToServer
 						go func(userAddr *net.UDPAddr) {
@@ -224,7 +219,7 @@ func main() {
 							var num int
 							var error error
 							for {
-								num, error = connectionToServer.Read(buff)
+								num, error = (*connectionToServer).Read(buff)
 								if error != nil {
 									fmt.Printf("failed to read packet from server\n%s\n", error.Error())
 									break
@@ -236,7 +231,7 @@ func main() {
 								}
 							}
 						}(userAddress)
-						_, e = connectionToServer.Write(buff)
+						_, e = (*connectionToServer).Write(buff)
 						if e != nil {
 							fmt.Printf("failed to write packet to server\n%s\n", e.Error())
 							return
@@ -283,11 +278,11 @@ func main() {
 
 			if masterConnectionToServer == nil {
 				// use the first connection as the master connection
-				masterConnectionToServer = connectionToServer.(*tls.Conn)
+				masterConnectionToServer = &connectionToServer
 				fmt.Println("master connection to server stablished")
 			} else {
 				// add stablished connection to the pool
-				pool <- connectionToServer.(*tls.Conn)
+				pool <- &connectionToServer
 			}
 		}
 	}
