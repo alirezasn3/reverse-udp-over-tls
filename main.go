@@ -176,9 +176,9 @@ func main() {
 			}
 		}
 	} else {
-		pool := make(chan net.Conn, 1024)
-		userAddressToConnectionTable := make(map[string]net.Conn)
-		var masterConnectionToServer net.Conn = nil
+		pool := make(chan *tls.Conn, 1024)
+		userAddressToConnectionTable := make(map[string]*tls.Conn)
+		var masterConnectionToServer *tls.Conn = nil
 
 		go func() {
 			// create local listener
@@ -198,12 +198,13 @@ func main() {
 			var n int
 			var e error
 			var ok bool
-			var connectionToServer net.Conn
+			var connectionToServer *tls.Conn
 			var userAddress *net.UDPAddr
 			for {
 				n, userAddress, e = localListener.ReadFromUDP(b)
 				if e != nil {
 					fmt.Printf("failed to read packet from user\n%s\n", e.Error())
+					continue
 				}
 
 				if connectionToServer, ok = userAddressToConnectionTable[userAddress.String()]; ok {
@@ -282,11 +283,11 @@ func main() {
 
 			if masterConnectionToServer == nil {
 				// use the first connection as the master connection
-				masterConnectionToServer = connectionToServer
+				masterConnectionToServer = connectionToServer.(*tls.Conn)
 				fmt.Println("master connection to server stablished")
 			} else {
 				// add stablished connection to the pool
-				pool <- connectionToServer
+				pool <- connectionToServer.(*tls.Conn)
 			}
 		}
 	}
