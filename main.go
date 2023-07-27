@@ -4,9 +4,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net"
-	"net/http"
 	"os"
 )
 
@@ -247,49 +245,49 @@ func main() {
 			}
 		}()
 
-		// create https server
-		if err := http.ListenAndServeTLS(config.TCPListen, config.CertificateLocation, config.KeyLocation,
-			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				// read body
-				defer r.Body.Close()
-				body, err := io.ReadAll(r.Body)
-				if err != nil {
-					fmt.Printf("failed to read request body\n%s\n", err.Error())
-					w.WriteHeader(400)
-					return
-				}
-				if string(body) == config.Secret {
-					fmt.Printf("received new tunnel request from %s\n", r.RemoteAddr)
+		// listen for incoming connection from server
+		listener, err := tls.Listen("tcp", config.TCPListen, &config.TLSConfig)
+		if err != nil {
+			panic(fmt.Sprintf("failed to create listener on %s,\n%s\n", config.TCPListen, err.Error()))
+		}
 
-					// hijack underlying connection
-					connectionToServer, _, err := w.(http.Hijacker).Hijack()
-					if err != nil {
-						fmt.Printf("failed to hijack connection\n%s\n", err.Error())
-						return
-					}
+		// accept new connections from server
+		b := make([]byte, 1024*8)
+		for {
+			connectionToServer, err := listener.Accept()
+			if err != nil {
+				fmt.Printf("failed to accept new connection from server\n%s\n", err.Error())
+				continue
+			}
 
-					// send ok packet to server
-					_, err = connectionToServer.Write([]byte("ok"))
-					if err != nil {
-						fmt.Printf("failed to send ok packet to server\n%s\n", err.Error())
-						return
-					}
+			// read secret from client
+			n, err := connectionToServer.Read(b)
+			if err != nil {
+				fmt.Printf("failed to read secret from server\n%s\n", err.Error())
+				continue
+			}
 
-					if masterConnectionToServer == nil {
-						// use the first connection as the master connection
-						masterConnectionToServer = &connectionToServer
-						fmt.Println("master connection to server stablished")
-					} else {
-						// add stablished connection to the pool
-						pool <- connectionToServer
-					}
-				} else {
-					w.WriteHeader(200)
-					w.Write([]byte("Hello World!"))
-				}
-			}),
-		); err != nil {
-			panic(err)
+			// check if secret is valid
+			if string(b[:n]) != config.Secret {
+				connectionToServer.Close()
+				continue
+			}
+
+			// send ok packet to server
+			_, err = connectionToServer.Write([]byte("ok"))
+			if err != nil {
+				fmt.Printf("failed to send ok packet to server\n%s\n", err.Error())
+				continue
+			}
+
+			if masterConnectionToServer == nil {
+				// use the first connection as the master connection
+				masterConnectionToServer = &connectionToServer
+				fmt.Println("master connection to server stablished")
+			} else {
+				// add stablished connection to the pool
+				pool <- connectionToServer
+			}
 		}
 	}
 }
