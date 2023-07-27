@@ -178,7 +178,7 @@ func main() {
 	} else {
 		pool := make(chan net.Conn, 1024)
 		userAddressToConnectionTable := make(map[string]net.Conn)
-		var masterConnectionToServer *net.Conn = nil
+		var masterConnectionToServer net.Conn = nil
 
 		go func() {
 			// create local listener
@@ -214,7 +214,7 @@ func main() {
 				} else {
 					go func(buff []byte) {
 						fmt.Println("waiting for connection from server")
-						(*masterConnectionToServer).Write([]byte("0"))
+						masterConnectionToServer.Write([]byte("0"))
 						connectionToServer = <-pool
 						fmt.Println("assigning connection to user")
 						userAddressToConnectionTable[userAddress.String()] = connectionToServer
@@ -282,7 +282,7 @@ func main() {
 
 			if masterConnectionToServer == nil {
 				// use the first connection as the master connection
-				masterConnectionToServer = &connectionToServer
+				masterConnectionToServer = connectionToServer
 				fmt.Println("master connection to server stablished")
 			} else {
 				// add stablished connection to the pool
