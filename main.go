@@ -203,6 +203,7 @@ func main() {
 					_, e = (*userAddressToConnectionTable[userAddress.String()]).Write(b[:n])
 					if e != nil {
 						fmt.Printf("failed to write packet to server\n%s\n", e.Error())
+						delete(userAddressToConnectionTable, userAddress.String())
 					}
 				} else {
 					go func(buff []byte) {
@@ -233,7 +234,7 @@ func main() {
 						_, e = (*connectionToServer).Write(buff)
 						if e != nil {
 							fmt.Printf("failed to write packet to server\n%s\n", e.Error())
-							return
+							delete(userAddressToConnectionTable, userAddress.String())
 						}
 					}(b[:n])
 				}
