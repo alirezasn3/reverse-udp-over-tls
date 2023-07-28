@@ -143,7 +143,7 @@ func main() {
 			time.Sleep(time.Second)
 			masterConnectionToClient, err = createConnectionToClient()
 		}
-		fmt.Println("created master connection to client")
+		fmt.Println("stablished master connection to client")
 
 		b := make([]byte, 1024*8)
 		var e error
@@ -154,7 +154,7 @@ func main() {
 				fmt.Printf("failed to read from master connection\n%s\n", err.Error())
 				masterConnectionToClient, err = createConnectionToClient()
 				for err != nil {
-					fmt.Printf("failed to create master connection to client\n%s\n", err.Error())
+					fmt.Printf("failed to stablish master connection to client\n%s\n", err.Error())
 					masterConnectionToClient, err = createConnectionToClient()
 					time.Sleep(time.Second)
 				}
@@ -181,11 +181,11 @@ func main() {
 			// create local listener
 			listenAddress, err := net.ResolveUDPAddr("udp4", config.UDPListen)
 			if err != nil {
-				fmt.Printf("failed to parse udp listen address %s\n%s\n", config.UDPListen, err.Error())
+				panic(err)
 			}
 			localListener, err := net.ListenUDP("udp4", listenAddress)
 			if err != nil {
-				fmt.Printf("failed to listen on %s\n%s", config.UDPListen, err.Error())
+				panic(err)
 			}
 			defer localListener.Close()
 			fmt.Println("listening on " + config.UDPListen)
@@ -193,11 +193,13 @@ func main() {
 			// handle packets from users
 			b := make([]byte, 1024*8)
 			for {
+				// read packet from user
 				n, userAddress, e := localListener.ReadFromUDP(b)
 				if e != nil {
 					continue
 				}
 
+				// check if user has connection to server
 				if userAddressToConnectionTable[userAddress.String()] != nil {
 					_, e = (*userAddressToConnectionTable[userAddress.String()]).Write(b[:n])
 					if e != nil {
@@ -245,7 +247,7 @@ func main() {
 		// listen for incoming connection from server
 		listener, err := tls.Listen("tcp", config.TCPListen, &config.TLSConfig)
 		if err != nil {
-			panic(fmt.Sprintf("failed to create listener on %s,\n%s\n", config.TCPListen, err.Error()))
+			panic(err)
 		}
 
 		// accept new connections from server

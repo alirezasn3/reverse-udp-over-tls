@@ -8,7 +8,7 @@ Type=simple
 PIDFile=/run/reverse-udp-over-tls.pid
 ExecStart= /root/reverse-udp-over-tls/reverse-udp-over-tls /root/reverse-udp-over-tls/
 Restart=on-failure
-RestartSec=10s
+RestartSec=1s
 
 [Install]
 WantedBy=multi-user.target
