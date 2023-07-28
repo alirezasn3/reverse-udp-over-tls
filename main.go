@@ -4,9 +4,9 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net"
 	"os"
+	"time"
 )
 
 var config Config
@@ -27,7 +27,6 @@ func createConnectionToClient() (*tls.Conn, error) {
 	// connect to client
 	connectionToClient, err := tls.Dial("tcp", config.TCPConnect, &config.TLSConfig)
 	if err != nil {
-
 		return nil, fmt.Errorf("failed to connect to client at %s\n%s", config.TCPConnect, err.Error())
 	}
 
@@ -41,7 +40,7 @@ func createConnectionToClient() (*tls.Conn, error) {
 	buffer := make([]byte, 1024*8)
 	readBytes, err := connectionToClient.Read(buffer)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read first packet from client\n%s\n", err.Error())
+		return nil, fmt.Errorf("failed to read first packet from client\n%s", err.Error())
 	}
 	if string(buffer[:readBytes]) != "ok" {
 		return nil, fmt.Errorf("did not receive ok packet from client")
@@ -139,36 +138,35 @@ func main() {
 	if config.Role == "server" {
 		// create master conncetion
 		masterConnectionToClient, err := createConnectionToClient()
-		if err != nil {
-			panic(err)
+		for err != nil {
+			fmt.Printf("failed to create master connection to client\n%s\n", err.Error())
+			time.Sleep(time.Second)
+			masterConnectionToClient, err = createConnectionToClient()
 		}
 		fmt.Println("created master connection to client")
 
 		b := make([]byte, 1024*8)
-		var n int
 		var e error
 		for {
 			// read from master connection to client
-			n, e = masterConnectionToClient.Read(b)
+			_, e = masterConnectionToClient.Read(b)
 			if e != nil {
-				if e == io.EOF {
+				fmt.Printf("failed to read from master connection\n%s\n", err.Error())
+				masterConnectionToClient, err = createConnectionToClient()
+				for err != nil {
+					fmt.Printf("failed to create master connection to client\n%s\n", err.Error())
 					masterConnectionToClient, err = createConnectionToClient()
-					if err != nil {
-						fmt.Println(err)
-						continue
-					}
-				} else {
-					panic(e)
+					time.Sleep(time.Second)
 				}
 			}
 
 			// check for commands
-			if string(b[:n]) == "0" { // create new connection to client
-				fmt.Println("creating new connection to client")
+			if b[0] == byte(0) { // create new connection to client
 				go func() {
 					connectionToClient, e := createConnectionToClient()
 					if e != nil {
 						fmt.Println(e)
+						return
 					}
 					handleConnectionToClient(connectionToClient)
 				}()
@@ -208,14 +206,12 @@ func main() {
 					}
 				} else {
 					go func(buff []byte) {
-						fmt.Println("waiting for connection from server")
 						if masterConnectionToServer == nil {
 							fmt.Println("cant request new connection to server, master connection is closed")
 							return
 						}
-						(*masterConnectionToServer).Write([]byte("0"))
+						(*masterConnectionToServer).Write([]byte{0})
 						connectionToServer := <-pool
-						fmt.Println("assigning connection to user")
 						userAddressToConnectionTable[userAddress.String()] = connectionToServer
 						go func(userAddr *net.UDPAddr) {
 							buff := make([]byte, 1024*8)
