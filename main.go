@@ -139,7 +139,7 @@ func main() {
 		// create master conncetion
 		masterConnectionToClient, err := createConnectionToClient()
 		for err != nil {
-			fmt.Printf("failed to create master connection to client\n%s\n", err.Error())
+			fmt.Println(err.Error())
 			time.Sleep(time.Second)
 			masterConnectionToClient, err = createConnectionToClient()
 		}
@@ -195,14 +195,12 @@ func main() {
 			for {
 				n, userAddress, e := localListener.ReadFromUDP(b)
 				if e != nil {
-					fmt.Printf("failed to read packet from user\n%s\n", e.Error())
 					continue
 				}
 
 				if userAddressToConnectionTable[userAddress.String()] != nil {
 					_, e = (*userAddressToConnectionTable[userAddress.String()]).Write(b[:n])
 					if e != nil {
-						fmt.Printf("failed to write packet to server\n%s\n", e.Error())
 						delete(userAddressToConnectionTable, userAddress.String())
 					}
 				} else {
@@ -211,7 +209,11 @@ func main() {
 							fmt.Println("cant request new connection to server, master connection is closed")
 							return
 						}
-						(*masterConnectionToServer).Write([]byte{0})
+						_, e = (*masterConnectionToServer).Write([]byte{0})
+						if e != nil {
+							masterConnectionToServer = nil
+							return
+						}
 						connectionToServer := <-pool
 						userAddressToConnectionTable[userAddress.String()] = connectionToServer
 						go func(userAddr *net.UDPAddr) {
@@ -233,7 +235,6 @@ func main() {
 						}(userAddress)
 						_, e = (*connectionToServer).Write(buff)
 						if e != nil {
-							fmt.Printf("failed to write packet to server\n%s\n", e.Error())
 							delete(userAddressToConnectionTable, userAddress.String())
 						}
 					}(b[:n])
