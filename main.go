@@ -72,13 +72,11 @@ func handleConnectionToClient(connectionToClient *tls.Conn) {
 			// read packet from client
 			n, e = connectionToClient.Read(b)
 			if e != nil {
-				fmt.Printf("failed to read packet from client\n%s\n", e.Error())
 				break
 			}
 			// write packet to local service
 			_, e = connectionToLocalService.Write(b[:n])
 			if e != nil {
-				fmt.Printf("failed to write packet to local service%s\n%s\n", config.UDPConnect, e.Error())
 				break
 			}
 
@@ -93,13 +91,11 @@ func handleConnectionToClient(connectionToClient *tls.Conn) {
 		// read packet from local service
 		n, e = connectionToLocalService.Read(b)
 		if e != nil {
-			fmt.Printf("failed to read packet from %s\n%s\n", config.UDPConnect, e.Error())
 			break
 		}
 		// write packet to client
 		_, e = connectionToClient.Write(b[:n])
 		if e != nil {
-			fmt.Printf("failed to write packet to %s\n%s\n", config.TCPConnect, e.Error())
 			break
 		}
 	}
@@ -225,12 +221,10 @@ func main() {
 							for {
 								num, error = (*connectionToServer).Read(buff)
 								if error != nil {
-									fmt.Printf("failed to read packet from server\n%s\n", error.Error())
 									break
 								}
 								_, error = localListener.WriteToUDP(buff[:num], userAddr)
 								if error != nil {
-									fmt.Printf("failed to write packet to user at %s\n%s\n", userAddr, error.Error())
 									break
 								}
 							}
