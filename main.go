@@ -33,6 +33,9 @@ func createConnectionToClient() (*tls.Conn, error) {
 	// initialize connection
 	_, err = connectionToClient.Write([]byte(config.Secret))
 	if err != nil {
+		if connectionToClient != nil {
+			connectionToClient.Close()
+		}
 		return nil, err
 	}
 
@@ -40,9 +43,15 @@ func createConnectionToClient() (*tls.Conn, error) {
 	buffer := make([]byte, 1024*8)
 	readBytes, err := connectionToClient.Read(buffer)
 	if err != nil {
+		if connectionToClient != nil {
+			connectionToClient.Close()
+		}
 		return nil, err
 	}
 	if string(buffer[:readBytes]) != "ok" {
+		if connectionToClient != nil {
+			connectionToClient.Close()
+		}
 		return nil, err
 	}
 	return connectionToClient, nil
@@ -59,7 +68,10 @@ func handleConnectionToClient(connectionToClient *tls.Conn) {
 	// create connection serivce
 	connectionToLocalService, err := net.DialUDP("udp4", nil, localServiceAddress)
 	if err != nil {
-		fmt.Printf("failed to open udp connection to %s\n%s\n", config.UDPConnect, err.Error())
+		fmt.Println(err)
+		if connectionToLocalService != nil {
+			connectionToLocalService.Close()
+		}
 		return
 	}
 
@@ -98,6 +110,14 @@ func handleConnectionToClient(connectionToClient *tls.Conn) {
 		if e != nil {
 			break
 		}
+	}
+
+	// close connections
+	if connectionToLocalService != nil {
+		connectionToLocalService.Close()
+	}
+	if connectionToClient != nil {
+		connectionToClient.Close()
 	}
 }
 
@@ -162,12 +182,42 @@ func main() {
 					}
 					handleConnectionToClient(connectionToClient)
 				}()
+			} else if b[0] == byte(1) {
+				_, err = masterConnectionToClient.Write([]byte{2})
+				if err != nil {
+					if masterConnectionToClient != nil {
+						masterConnectionToClient.Close()
+					}
+				}
 			}
 		}
 	} else {
 		pool := make(chan *net.Conn, 1024)
 		userAddressToConnectionTable := make(map[string]*net.Conn)
 		var masterConnectionToServer *net.Conn = nil
+
+		go func() {
+			var e error
+			b := make([]byte, 1024*8) 
+			for {
+				if (*masterConnectionToServer) != nil {
+					_, e = (*masterConnectionToServer).Read(b)
+					if e != nil {
+					if (*masterConnectionToServer) != nil {
+						(*masterConnectionToServer).Close()
+						masterConnectionToServer = nil
+					}
+					}
+					if b[0] == byte(1) {
+						_, e = (*masterConnectionToServer).Write([]byte{2})
+						if (*masterConnectionToServer) != nil {
+							(*masterConnectionToServer).Close()
+							masterConnectionToServer = nil
+						}
+					}
+				}
+			}
+		}()
 
 		go func() {
 			// create local listener
@@ -195,6 +245,9 @@ func main() {
 				if userAddressToConnectionTable[userAddress.String()] != nil {
 					_, e = (*userAddressToConnectionTable[userAddress.String()]).Write(b[:n])
 					if e != nil {
+						if (*userAddressToConnectionTable[userAddress.String()]) != nil {
+							(*userAddressToConnectionTable[userAddress.String()]).Close()
+						}
 						delete(userAddressToConnectionTable, userAddress.String())
 					}
 				} else {
@@ -216,6 +269,9 @@ func main() {
 							for {
 								num, err = (*connectionToServer).Read(buff)
 								if err != nil {
+									if (*connectionToServer) != nil {
+										(*connectionToServer).Close()
+									}
 									break
 								}
 								_, err = localListener.WriteToUDP(buff[:num], userAddr)
@@ -226,6 +282,9 @@ func main() {
 						}(userAddress)
 						_, e = (*connectionToServer).Write(buff)
 						if e != nil {
+							if (*connectionToServer) != nil {
+								(*connectionToServer).Close()
+							}
 							delete(userAddressToConnectionTable, userAddress.String())
 						}
 					}(b[:n])
@@ -244,14 +303,17 @@ func main() {
 		for {
 			connectionToServer, err := listener.Accept()
 			if err != nil {
-				fmt.Printf("failed to accept new connection from server\n%s\n", err.Error())
+				fmt.Println(err)
 				continue
 			}
 
 			// read secret from client
 			n, err := connectionToServer.Read(b)
 			if err != nil {
-				fmt.Printf("failed to read secret from server\n%s\n", err.Error())
+				fmt.Println(err)
+				if connectionToServer != nil {
+					connectionToServer.Close()
+				}
 				continue
 			}
 
@@ -264,6 +326,10 @@ func main() {
 			// send ok packet to server
 			_, err = connectionToServer.Write([]byte("ok"))
 			if err != nil {
+				fmt.Println(err)
+				if connectionToServer != nil {
+					connectionToServer.Close()
+				}
 				continue
 			}
 
