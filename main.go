@@ -27,23 +27,23 @@ func createConnectionToClient() (*tls.Conn, error) {
 	// connect to client
 	connectionToClient, err := tls.Dial("tcp", config.TCPConnect, &config.TLSConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to client at %s\n%s", config.TCPConnect, err.Error())
+		return nil, err
 	}
 
 	// initialize connection
 	_, err = connectionToClient.Write([]byte(config.Secret))
 	if err != nil {
-		return nil, fmt.Errorf("failed to send raw http request to client at %s\n%s", config.TCPConnect, err.Error())
+		return nil, err
 	}
 
 	// read first packet from client
 	buffer := make([]byte, 1024*8)
 	readBytes, err := connectionToClient.Read(buffer)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read first packet from client\n%s", err.Error())
+		return nil, err
 	}
 	if string(buffer[:readBytes]) != "ok" {
-		return nil, fmt.Errorf("did not receive ok packet from client")
+		return nil, err
 	}
 	return connectionToClient, nil
 }
@@ -135,7 +135,6 @@ func main() {
 		// create master conncetion
 		masterConnectionToClient, err := createConnectionToClient()
 		for err != nil {
-			fmt.Println(err.Error())
 			time.Sleep(time.Second)
 			masterConnectionToClient, err = createConnectionToClient()
 		}
@@ -147,10 +146,8 @@ func main() {
 			// read from master connection to client
 			_, e = masterConnectionToClient.Read(b)
 			if e != nil {
-				fmt.Printf("failed to read from master connection\n%s\n", err.Error())
 				masterConnectionToClient, err = createConnectionToClient()
 				for err != nil {
-					fmt.Printf("failed to stablish master connection to client\n%s\n", err.Error())
 					masterConnectionToClient, err = createConnectionToClient()
 					time.Sleep(time.Second)
 				}
@@ -161,7 +158,6 @@ func main() {
 				go func() {
 					connectionToClient, e := createConnectionToClient()
 					if e != nil {
-						fmt.Println(e)
 						return
 					}
 					handleConnectionToClient(connectionToClient)
@@ -204,7 +200,6 @@ func main() {
 				} else {
 					go func(buff []byte) {
 						if masterConnectionToServer == nil {
-							fmt.Println("cant request new connection to server, master connection is closed")
 							return
 						}
 						_, e = (*masterConnectionToServer).Write([]byte{0})
@@ -217,14 +212,14 @@ func main() {
 						go func(userAddr *net.UDPAddr) {
 							buff := make([]byte, 1024*8)
 							var num int
-							var error error
+							var err error
 							for {
-								num, error = (*connectionToServer).Read(buff)
-								if error != nil {
+								num, err = (*connectionToServer).Read(buff)
+								if err != nil {
 									break
 								}
-								_, error = localListener.WriteToUDP(buff[:num], userAddr)
-								if error != nil {
+								_, err = localListener.WriteToUDP(buff[:num], userAddr)
+								if err != nil {
 									break
 								}
 							}
@@ -269,7 +264,6 @@ func main() {
 			// send ok packet to server
 			_, err = connectionToServer.Write([]byte("ok"))
 			if err != nil {
-				fmt.Printf("failed to send ok packet to server\n%s\n", err.Error())
 				continue
 			}
 
