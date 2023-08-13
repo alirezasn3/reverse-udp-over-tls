@@ -75,23 +75,39 @@ func handleConnectionToClient(connectionToClient *tls.Conn) {
 		return
 	}
 
+	// close connections when done
+	defer func() {
+		if connectionToLocalService != nil {
+			connectionToLocalService.Close()
+		}
+		if connectionToClient != nil {
+			connectionToClient.Close()
+		}
+	}()
+
 	// handle incoming packets from client
 	go func() {
+		d := time.Hour
 		b := make([]byte, 1024*8)
 		var n int
 		var e error
 		for {
+			// set read deadline
+			e = connectionToClient.SetReadDeadline(time.Now().Add(d))
+			if e != nil {
+				return
+			}
+
 			// read packet from client
 			n, e = connectionToClient.Read(b)
 			if e != nil {
-				break
+				return
 			}
 			// write packet to local service
 			_, e = connectionToLocalService.Write(b[:n])
 			if e != nil {
-				break
+				return
 			}
-
 		}
 	}()
 
@@ -103,21 +119,13 @@ func handleConnectionToClient(connectionToClient *tls.Conn) {
 		// read packet from local service
 		n, e = connectionToLocalService.Read(b)
 		if e != nil {
-			break
+			return
 		}
 		// write packet to client
 		_, e = connectionToClient.Write(b[:n])
 		if e != nil {
-			break
+			return
 		}
-	}
-
-	// close connections
-	if connectionToLocalService != nil {
-		connectionToLocalService.Close()
-	}
-	if connectionToClient != nil {
-		connectionToClient.Close()
 	}
 }
 
@@ -198,21 +206,23 @@ func main() {
 
 		go func() {
 			var e error
-			b := make([]byte, 1024*8) 
+			b := make([]byte, 1024*8)
 			for {
 				if masterConnectionToServer != nil {
 					_, e = (*masterConnectionToServer).Read(b)
 					if e != nil {
-					if masterConnectionToServer != nil {
-						(*masterConnectionToServer).Close()
-						masterConnectionToServer = nil
-					}
-					}
-					if b[0] == byte(1) {
-						_, e = (*masterConnectionToServer).Write([]byte{2})
 						if masterConnectionToServer != nil {
 							(*masterConnectionToServer).Close()
 							masterConnectionToServer = nil
+						}
+					}
+					if b[0] == byte(1) {
+						_, e = (*masterConnectionToServer).Write([]byte{2})
+						if e != nil {
+							if masterConnectionToServer != nil {
+								(*masterConnectionToServer).Close()
+								masterConnectionToServer = nil
+							}
 						}
 					}
 				}
@@ -263,20 +273,23 @@ func main() {
 						connectionToServer := <-pool
 						userAddressToConnectionTable[userAddress.String()] = connectionToServer
 						go func(userAddr *net.UDPAddr) {
+							defer func() {
+								if connectionToServer != nil {
+									(*connectionToServer).Close()
+								}
+								delete(userAddressToConnectionTable, userAddress.String())
+							}()
 							buff := make([]byte, 1024*8)
 							var num int
 							var err error
 							for {
 								num, err = (*connectionToServer).Read(buff)
 								if err != nil {
-									if connectionToServer != nil {
-										(*connectionToServer).Close()
-									}
-									break
+									return
 								}
 								_, err = localListener.WriteToUDP(buff[:num], userAddr)
 								if err != nil {
-									break
+									return
 								}
 							}
 						}(userAddress)
