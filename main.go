@@ -200,17 +200,17 @@ func main() {
 			var e error
 			b := make([]byte, 1024*8) 
 			for {
-				if (*masterConnectionToServer) != nil {
+				if masterConnectionToServer != nil {
 					_, e = (*masterConnectionToServer).Read(b)
 					if e != nil {
-					if (*masterConnectionToServer) != nil {
+					if masterConnectionToServer != nil {
 						(*masterConnectionToServer).Close()
 						masterConnectionToServer = nil
 					}
 					}
 					if b[0] == byte(1) {
 						_, e = (*masterConnectionToServer).Write([]byte{2})
-						if (*masterConnectionToServer) != nil {
+						if masterConnectionToServer != nil {
 							(*masterConnectionToServer).Close()
 							masterConnectionToServer = nil
 						}
@@ -245,7 +245,7 @@ func main() {
 				if userAddressToConnectionTable[userAddress.String()] != nil {
 					_, e = (*userAddressToConnectionTable[userAddress.String()]).Write(b[:n])
 					if e != nil {
-						if (*userAddressToConnectionTable[userAddress.String()]) != nil {
+						if userAddressToConnectionTable[userAddress.String()] != nil {
 							(*userAddressToConnectionTable[userAddress.String()]).Close()
 						}
 						delete(userAddressToConnectionTable, userAddress.String())
@@ -269,7 +269,7 @@ func main() {
 							for {
 								num, err = (*connectionToServer).Read(buff)
 								if err != nil {
-									if (*connectionToServer) != nil {
+									if connectionToServer != nil {
 										(*connectionToServer).Close()
 									}
 									break
@@ -282,7 +282,7 @@ func main() {
 						}(userAddress)
 						_, e = (*connectionToServer).Write(buff)
 						if e != nil {
-							if (*connectionToServer) != nil {
+							if connectionToServer != nil {
 								(*connectionToServer).Close()
 							}
 							delete(userAddressToConnectionTable, userAddress.String())
