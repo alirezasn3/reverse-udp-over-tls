@@ -7,6 +7,8 @@ import (
 	"net"
 	"os"
 	"time"
+
+	"golang.org/x/sync/syncmap"
 )
 
 var config Config
@@ -201,7 +203,7 @@ func main() {
 		}
 	} else {
 		pool := make(chan *net.Conn, 1024)
-		userAddressToConnectionTable := make(map[string]*net.Conn)
+		userAddressToConnectionTable := syncmap.Map{}
 		var masterConnectionToServer *net.Conn = nil
 
 		go func() {
@@ -252,13 +254,11 @@ func main() {
 				}
 
 				// check if user has connection to server
-				if userAddressToConnectionTable[userAddress.String()] != nil {
-					_, e = (*userAddressToConnectionTable[userAddress.String()]).Write(b[:n])
+				if conn, ok := userAddressToConnectionTable.Load(userAddress.String()); ok {
+					_, e = conn.(net.Conn).Write(b[:n])
 					if e != nil {
-						if userAddressToConnectionTable[userAddress.String()] != nil {
-							(*userAddressToConnectionTable[userAddress.String()]).Close()
-						}
-						delete(userAddressToConnectionTable, userAddress.String())
+						conn.(net.Conn).Close()
+						userAddressToConnectionTable.Delete(userAddress.String())
 					}
 				} else {
 					go func(buff []byte) {
@@ -271,13 +271,13 @@ func main() {
 							return
 						}
 						connectionToServer := <-pool
-						userAddressToConnectionTable[userAddress.String()] = connectionToServer
+						userAddressToConnectionTable.Store(userAddress.String(), connectionToServer)
 						go func(userAddr *net.UDPAddr) {
 							defer func() {
 								if connectionToServer != nil {
 									(*connectionToServer).Close()
 								}
-								delete(userAddressToConnectionTable, userAddress.String())
+								userAddressToConnectionTable.Delete(userAddress.String())
 							}()
 							buff := make([]byte, 1024*8)
 							var num int
@@ -298,7 +298,7 @@ func main() {
 							if connectionToServer != nil {
 								(*connectionToServer).Close()
 							}
-							delete(userAddressToConnectionTable, userAddress.String())
+							userAddressToConnectionTable.Delete(userAddress.String())
 						}
 					}(b[:n])
 				}
