@@ -89,7 +89,7 @@ func handleConnectionToClient(connectionToClient *tls.Conn) {
 
 	// handle incoming packets from client
 	go func() {
-		d := time.Hour
+		d := time.Hour * 12
 		b := make([]byte, 1500)
 		var n int
 		var e error
@@ -148,27 +148,58 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	config.TLSConfig.MinVersion = tls.VersionTLS12
+	config.TLSConfig.MinVersion = tls.VersionTLS13
 	config.TLSConfig.Certificates = []tls.Certificate{certificate}
 	config.TLSConfig.InsecureSkipVerify = true
-	config.TLSConfig.CurvePreferences = []tls.CurveID{tls.CurveP521, tls.CurveP384, tls.CurveP256}
-	config.TLSConfig.CipherSuites = []uint16{
-		tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
-		tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
-		tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
-		tls.TLS_RSA_WITH_AES_256_CBC_SHA,
-	}
 }
 
 func main() {
 	if config.Role == "server" {
+		lastReceivedPacket := time.Now().Unix()
+
 		// create master conncetion
 		masterConnectionToClient, err := createConnectionToClient()
 		for err != nil {
 			time.Sleep(time.Second)
+			masterConnectionToClient.Close()
 			masterConnectionToClient, err = createConnectionToClient()
 		}
-		fmt.Println("stablished master connection to client")
+		fmt.Println("master connection to client stablished")
+
+		// check last reveived packet from client
+		go func() {
+			var e error
+			for {
+				if time.Now().Unix()-lastReceivedPacket > 5 {
+					fmt.Println("did not receive packet from client, creating new master connection")
+					masterConnectionToClient.Close()
+					masterConnectionToClient, e = createConnectionToClient()
+					for e != nil {
+						time.Sleep(time.Second)
+						masterConnectionToClient, e = createConnectionToClient()
+					}
+					fmt.Println("master connection to client stablished")
+					lastReceivedPacket = time.Now().Unix()
+				}
+				time.Sleep(time.Second)
+			}
+		}()
+
+		// send ping packet to client
+		go func() {
+			var e error
+			for {
+				if masterConnectionToClient != nil {
+					_, e = masterConnectionToClient.Write([]byte{1})
+					if e != nil {
+						fmt.Println("failed to send ping packet to client")
+						masterConnectionToClient.Close()
+						masterConnectionToClient = nil
+					}
+				}
+				time.Sleep(time.Second)
+			}
+		}()
 
 		b := make([]byte, 1)
 		var e error
@@ -183,6 +214,8 @@ func main() {
 				}
 			}
 
+			lastReceivedPacket = time.Now().Unix()
+
 			// check for commands
 			if b[0] == byte(0) { // create new connection to client
 				go func() {
@@ -192,13 +225,6 @@ func main() {
 					}
 					handleConnectionToClient(connectionToClient)
 				}()
-			} else if b[0] == byte(1) {
-				_, err = masterConnectionToClient.Write([]byte{2})
-				if err != nil {
-					if masterConnectionToClient != nil {
-						masterConnectionToClient.Close()
-					}
-				}
 			}
 		}
 	} else {
@@ -206,31 +232,22 @@ func main() {
 		userAddressToConnectionTable := syncmap.Map{}
 		var masterConnectionToServer *net.Conn = nil
 
+		// send ping packet every 2 seconds
 		go func() {
 			var e error
-			b := make([]byte, 1500)
 			for {
 				if masterConnectionToServer != nil {
-					_, e = (*masterConnectionToServer).Read(b)
+					_, e = (*masterConnectionToServer).Write([]byte{1})
 					if e != nil {
-						if masterConnectionToServer != nil {
-							(*masterConnectionToServer).Close()
-							masterConnectionToServer = nil
-						}
-					}
-					if b[0] == byte(1) {
-						_, e = (*masterConnectionToServer).Write([]byte{2})
-						if e != nil {
-							if masterConnectionToServer != nil {
-								(*masterConnectionToServer).Close()
-								masterConnectionToServer = nil
-							}
-						}
+						(*masterConnectionToServer).Close()
+						*masterConnectionToServer = nil
 					}
 				}
+				time.Sleep(time.Second * 2)
 			}
 		}()
 
+		// listen for incoming packets from users
 		go func() {
 			// create local listener
 			listenAddress, err := net.ResolveUDPAddr("udp4", config.UDPListen)
@@ -262,12 +279,13 @@ func main() {
 					}
 				} else {
 					go func(buff []byte) {
-						if masterConnectionToServer == nil {
+						if *masterConnectionToServer == nil {
 							return
 						}
 						_, e = (*masterConnectionToServer).Write([]byte{0})
 						if e != nil {
-							masterConnectionToServer = nil
+							(*masterConnectionToServer).Close()
+							*masterConnectionToServer = nil
 							return
 						}
 						connectionToServer := <-pool
@@ -317,6 +335,7 @@ func main() {
 			connectionToServer, err := listener.Accept()
 			if err != nil {
 				fmt.Println(err)
+				connectionToServer.Close()
 				continue
 			}
 
@@ -324,9 +343,7 @@ func main() {
 			n, err := connectionToServer.Read(b)
 			if err != nil {
 				fmt.Println(err)
-				if connectionToServer != nil {
-					connectionToServer.Close()
-				}
+				connectionToServer.Close()
 				continue
 			}
 
@@ -346,9 +363,9 @@ func main() {
 				continue
 			}
 
-			if masterConnectionToServer == nil {
+			if *masterConnectionToServer == nil {
 				// use the first connection as the master connection
-				masterConnectionToServer = &connectionToServer
+				*masterConnectionToServer = connectionToServer
 				fmt.Println("master connection to server stablished")
 			} else {
 				// add stablished connection to the pool
