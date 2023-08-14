@@ -252,6 +252,7 @@ func main() {
 				if e != nil {
 					continue
 				}
+				fmt.Println(n)
 
 				// check if user has connection to server
 				if conn, ok := userAddressToConnectionTable.Load(userAddress.String()); ok {
