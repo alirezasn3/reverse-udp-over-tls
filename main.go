@@ -42,7 +42,7 @@ func createConnectionToClient() (*tls.Conn, error) {
 	}
 
 	// read first packet from client
-	buffer := make([]byte, 1024*8)
+	buffer := make([]byte, 1500)
 	readBytes, err := connectionToClient.Read(buffer)
 	if err != nil {
 		if connectionToClient != nil {
@@ -90,7 +90,7 @@ func handleConnectionToClient(connectionToClient *tls.Conn) {
 	// handle incoming packets from client
 	go func() {
 		d := time.Hour
-		b := make([]byte, 1024*8)
+		b := make([]byte, 1500)
 		var n int
 		var e error
 		for {
@@ -114,7 +114,7 @@ func handleConnectionToClient(connectionToClient *tls.Conn) {
 	}()
 
 	// handle incoming packets from local service
-	b := make([]byte, 1024*8)
+	b := make([]byte, 1500)
 	var n int
 	var e error
 	for {
@@ -170,7 +170,7 @@ func main() {
 		}
 		fmt.Println("stablished master connection to client")
 
-		b := make([]byte, 1024*8)
+		b := make([]byte, 1)
 		var e error
 		for {
 			// read from master connection to client
@@ -208,7 +208,7 @@ func main() {
 
 		go func() {
 			var e error
-			b := make([]byte, 1024*8)
+			b := make([]byte, 1500)
 			for {
 				if masterConnectionToServer != nil {
 					_, e = (*masterConnectionToServer).Read(b)
@@ -245,7 +245,7 @@ func main() {
 			fmt.Println("listening on " + config.UDPListen)
 
 			// handle packets from users
-			b := make([]byte, 1024*8)
+			b := make([]byte, 1500)
 			for {
 				// read packet from user
 				n, userAddress, e := localListener.ReadFromUDP(b)
@@ -279,7 +279,7 @@ func main() {
 								}
 								userAddressToConnectionTable.Delete(userAddress.String())
 							}()
-							buff := make([]byte, 1024*8)
+							buff := make([]byte, 1500)
 							var num int
 							var err error
 							for {
@@ -312,7 +312,7 @@ func main() {
 		}
 
 		// accept new connections from server
-		b := make([]byte, 1024*8)
+		b := make([]byte, 1500)
 		for {
 			connectionToServer, err := listener.Accept()
 			if err != nil {
