@@ -38,9 +38,6 @@ func (s *Server) Run() {
 	var e error
 	var n int
 
-	// set read deadline
-	s.MasterConnection.SetReadDeadline(time.Now().Add(d))
-
 	// read from master connection
 	for {
 		// check if master connection exists
