@@ -31,7 +31,7 @@ func (c *Client) Run() {
 			diff = time.Now().UnixMilli() - c.LastSentKeepAlivePacket
 			if diff > 2500 {
 				if c.MasterConnection != nil {
-					_, e = c.MasterConnection.Write([]byte{0})
+					_, e = c.MasterConnection.Write([]byte{1})
 					if e != nil {
 						c.CleanUpMasterConnection()
 						continue

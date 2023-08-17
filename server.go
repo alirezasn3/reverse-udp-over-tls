@@ -24,7 +24,7 @@ func (s *Server) Run() {
 				for s.MasterConnection == nil {
 					s.MasterConnection, e = s.CreateConnection()
 					if e != nil {
-						fmt.Printf("[%s]\nfailed to crteate new connection\n", e.Error())
+						fmt.Printf("[%s]\nfailed to create new connection\n", e.Error())
 						time.Sleep(time.Second)
 					}
 				}
@@ -87,7 +87,7 @@ func (s *Server) Run() {
 
 func (s *Server) CreateConnection() (*tls.Conn, error) {
 	// connect to client
-	c, e := tls.Dial("tcp", GlobalConfig.TCPConnect, &GlobalConfig.TLSConfig)
+	c, e := tls.DialWithDialer(&net.Dialer{Timeout: time.Second * 3}, "tcp", GlobalConfig.TCPConnect, &GlobalConfig.TLSConfig)
 	if e != nil {
 		if c != nil {
 			c.Close()
