@@ -24,7 +24,7 @@ func (s *Server) Run() {
 				for s.MasterConnection == nil {
 					s.MasterConnection, e = s.CreateConnection()
 					if e != nil {
-						fmt.Printf("[%s]\nfailed to create new connection\n", e.Error())
+						fmt.Printf("[%s] failed to create new connection\n", e.Error())
 						time.Sleep(time.Second)
 					}
 				}
@@ -51,7 +51,7 @@ func (s *Server) Run() {
 		// read packet
 		n, e = s.MasterConnection.Read(b)
 		if e != nil {
-			fmt.Printf("[%s]\nfailed to read from master connection, cleaning up...\n", e.Error())
+			fmt.Printf("[%s] failed to read from master connection, cleaning up...\n", e.Error())
 			s.CleanUpMasterConnection()
 			continue
 		}
@@ -67,7 +67,7 @@ func (s *Server) Run() {
 			go func() {
 				connectionToClient, e := s.CreateConnection()
 				if e != nil {
-					fmt.Printf("[%s]\nfailed to create new connection\n", e.Error())
+					fmt.Printf("[%s] failed to create new connection\n", e.Error())
 					return
 				}
 
@@ -79,7 +79,7 @@ func (s *Server) Run() {
 		// update read deadline
 		e = s.MasterConnection.SetReadDeadline(time.Now().Add(d))
 		if e != nil {
-			fmt.Printf("[%s]\nfailed to set read deadline, cleaning up...\n", e.Error())
+			fmt.Printf("[%s] failed to set read deadline, cleaning up...\n", e.Error())
 			s.CleanUpMasterConnection()
 		}
 	}
