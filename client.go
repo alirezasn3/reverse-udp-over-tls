@@ -137,7 +137,7 @@ func (c *Client) Run() {
 		} else {
 			// check master connection
 			if c.MasterConnection == nil {
-				return
+				continue
 			}
 
 			// ask for new connection and handle the first packet
