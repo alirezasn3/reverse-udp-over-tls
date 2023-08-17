@@ -1,3 +1,4 @@
 certs
 config.json
 reverse-udp-over-tls
+reverse-udp-over-tls.exe
