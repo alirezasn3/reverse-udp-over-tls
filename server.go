@@ -53,10 +53,12 @@ func (s *Server) Run() {
 		if e != nil {
 			fmt.Printf("[%s]\nfailed to read from master connection, cleaning up...\n", e.Error())
 			s.CleanUpMasterConnection()
+			continue
 		}
 		if n == 0 {
 			fmt.Println("read 0 bytes from master connection, cleaning up...")
 			s.CleanUpMasterConnection()
+			continue
 		}
 
 		// check for commands
