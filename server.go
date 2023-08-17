@@ -20,11 +20,13 @@ func (s *Server) Run() {
 		var e error
 		for {
 			if s.MasterConnection == nil {
-				fmt.Println("master connection was closed, creating new master connection...")
+				fmt.Println("creating master connection to client...")
 				for s.MasterConnection == nil {
 					s.MasterConnection, e = s.CreateConnection()
-					fmt.Printf("[%s]\nfailed to crteate new connection\n", e.Error())
-					time.Sleep(time.Second)
+					if e != nil {
+						fmt.Printf("[%s]\nfailed to crteate new connection\n", e.Error())
+						time.Sleep(time.Second)
+					}
 				}
 				fmt.Println("stablished master connection to client")
 			}
