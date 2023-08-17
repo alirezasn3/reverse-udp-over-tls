@@ -30,7 +30,7 @@ func (s *Server) Run() {
 				}
 				fmt.Println("stablished master connection to client")
 			}
-			time.Sleep(time.Second)
+			time.Sleep(time.Millisecond * 500)
 		}
 	}()
 

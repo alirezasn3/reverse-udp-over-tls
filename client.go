@@ -20,6 +20,9 @@ func (c *Client) Run() {
 	// initialize connection pool
 	c.ConnectionPool = make(chan net.Conn, 1024)
 
+	//
+	c.LastSentKeepAlivePacket = time.Now().UnixMilli()
+
 	// send keep alive packet to server
 	go func() {
 		var e error
@@ -36,7 +39,7 @@ func (c *Client) Run() {
 					c.LastSentKeepAlivePacket = time.Now().UnixMilli()
 				}
 			}
-			time.Sleep(time.Millisecond * time.Duration(diff))
+			time.Sleep(time.Millisecond * 500)
 		}
 	}()
 
@@ -139,6 +142,7 @@ func (c *Client) Run() {
 				// ask server for new connection
 				_, e = c.MasterConnection.Write([]byte{0})
 				if e != nil {
+					fmt.Printf("[%s]\nfailed to write to master connection, cleaning up...", e.Error())
 					c.CleanUpMasterConnection()
 					return
 				}
