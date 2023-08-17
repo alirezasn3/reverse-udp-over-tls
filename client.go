@@ -67,6 +67,7 @@ func (c *Client) Run() {
 					fmt.Printf("[%s] failed to set read deadline for the new connection\n", e.Error())
 					conn.Close()
 				}
+				defer conn.SetDeadline(time.Time{})
 
 				// read secret from client
 				b := make([]byte, len(GlobalConfig.Secret))
@@ -127,20 +128,20 @@ func (c *Client) Run() {
 		}
 
 		// check if user has connection to server
-		if conn, _ := c.UserAddressToConnectionTable.Load(userAddress.String()); conn != nil {
+		if conn, ok := c.UserAddressToConnectionTable.Load(userAddress.String()); ok {
 			_, e = conn.(net.Conn).Write(b[:n])
 			if e != nil {
 				conn.(net.Conn).Close()
 				c.UserAddressToConnectionTable.Delete(userAddress.String())
 			}
 		} else {
+			// check master connection
+			if c.MasterConnection == nil {
+				return
+			}
+
 			// ask for new connection and handle the first packet
 			go func(firstPacket []byte) {
-				// check master connection
-				if c.MasterConnection == nil {
-					return
-				}
-
 				// ask server for new connection
 				fmt.Printf("requesting new connection from server for user %s, %d bytes\n", userAddress.String(), len(firstPacket))
 				_, e = c.MasterConnection.Write([]byte{0})
