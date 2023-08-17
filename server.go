@@ -174,7 +174,7 @@ func (s *Server) HandleConnection(connectionToClient *tls.Conn) {
 	}()
 
 	// timeout
-	d := time.Hour * 12
+	d := time.Hour
 
 	// handle incoming packets from client
 	go func() {
