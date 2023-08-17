@@ -61,6 +61,8 @@ func (s *Server) Run() {
 			continue
 		}
 
+		fmt.Println(string(b))
+
 		// check for commands
 		if b[0] == byte(0) {
 			// create new connection to client

@@ -33,6 +33,7 @@ func (c *Client) Run() {
 				if c.MasterConnection != nil {
 					_, e = c.MasterConnection.Write([]byte{1})
 					if e != nil {
+						fmt.Printf("[%s] failed to write to master connection, cleaning up...\n", e.Error())
 						c.CleanUpMasterConnection()
 						continue
 					}
@@ -54,7 +55,7 @@ func (c *Client) Run() {
 		for {
 			connectionToServer, e := listener.Accept()
 			if e != nil {
-				fmt.Printf("[%s]\nfailed to accept new connection\n", e.Error())
+				fmt.Printf("[%s] failed to accept new connection\n", e.Error())
 				continue
 			}
 
@@ -63,7 +64,7 @@ func (c *Client) Run() {
 				// set read deadline for the new connection
 				e := conn.SetReadDeadline(time.Now().Add(time.Second * 3))
 				if e != nil {
-					fmt.Printf("[%s]\nfailed to set read deadline for the new connection\n", e.Error())
+					fmt.Printf("[%s] failed to set read deadline for the new connection\n", e.Error())
 					conn.Close()
 				}
 
@@ -71,7 +72,7 @@ func (c *Client) Run() {
 				b := make([]byte, len(GlobalConfig.Secret))
 				n, e := conn.Read(b)
 				if e != nil {
-					fmt.Printf("[%s]\nfailed to read secret\n", e.Error())
+					fmt.Printf("[%s] failed to read secret\n", e.Error())
 					conn.Close()
 				}
 
@@ -84,7 +85,7 @@ func (c *Client) Run() {
 				// send ok packet to server
 				_, e = conn.Write([]byte(GlobalConfig.Secret))
 				if e != nil {
-					fmt.Printf("[%s]\nfailed to send secret back to server\n", e.Error())
+					fmt.Printf("[%s] failed to send secret back to server\n", e.Error())
 					conn.Close()
 				}
 
@@ -95,6 +96,7 @@ func (c *Client) Run() {
 				} else {
 					// add stablished connection to the pool
 					c.ConnectionPool <- conn
+					fmt.Println("received new connection to server")
 				}
 			}(connectionToServer)
 		}
@@ -142,7 +144,7 @@ func (c *Client) Run() {
 				// ask server for new connection
 				_, e = c.MasterConnection.Write([]byte{0})
 				if e != nil {
-					fmt.Printf("[%s]\nfailed to write to master connection, cleaning up...", e.Error())
+					fmt.Printf("[%s] failed to write to master connection, cleaning up...\n", e.Error())
 					c.CleanUpMasterConnection()
 					return
 				}
@@ -203,4 +205,6 @@ func (c *Client) CleanUpMasterConnection() {
 	c.MasterConnection.Close()
 	c.MasterConnection = nil
 	c.CleaningUpMasterConnection = false
+
+	fmt.Println("master connection closed")
 }
