@@ -30,8 +30,10 @@ func (c *Client) Run() {
 				if c.MasterConnection != nil {
 					_, e = c.MasterConnection.Write([]byte{0})
 					if e != nil {
-						c.LastSentKeepAlivePacket = time.Now().UnixMilli()
+						c.CleanUpMasterConnection()
+						continue
 					}
+					c.LastSentKeepAlivePacket = time.Now().UnixMilli()
 				}
 			}
 			time.Sleep(time.Millisecond * time.Duration(diff))
