@@ -61,8 +61,6 @@ func (s *Server) Run() {
 			continue
 		}
 
-		fmt.Println(string(b))
-
 		// check for commands
 		if b[0] == byte(0) {
 			// create new connection to client
@@ -72,6 +70,8 @@ func (s *Server) Run() {
 					fmt.Printf("[%s] failed to create new connection\n", e.Error())
 					return
 				}
+
+				fmt.Println("created new connection to client")
 
 				// handle connection to client
 				s.HandleConnection(connectionToClient)
