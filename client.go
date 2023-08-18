@@ -27,11 +27,17 @@ func (c *Client) Run() {
 	go func() {
 		var e error
 		var diff int64
+		var i int
 		for {
 			diff = time.Now().UnixMilli() - c.LastSentKeepAlivePacket
 			if diff > 2500 {
 				if c.MasterConnection != nil {
-					_, e = c.MasterConnection.Write([]byte{1})
+					if len(c.ConnectionPool) < 5 {
+						i = 5 - len(c.ConnectionPool)
+					} else {
+						i = 0
+					}
+					_, e = c.MasterConnection.Write([]byte{byte(i)})
 					if e != nil {
 						fmt.Printf("[%s] failed to write to master connection, cleaning up...\n", e.Error())
 						c.CleanUpMasterConnection()
@@ -142,7 +148,7 @@ func (c *Client) Run() {
 			// ask for new connection and handle the first packet
 			go func(firstPacket []byte) {
 				// ask server for new connection
-				_, e = c.MasterConnection.Write([]byte{0})
+				_, e = c.MasterConnection.Write([]byte{byte(1)})
 				if e != nil {
 					fmt.Printf("[%s] failed to write to master connection, cleaning up...\n", e.Error())
 					c.CleanUpMasterConnection()

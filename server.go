@@ -62,19 +62,21 @@ func (s *Server) Run() {
 			continue
 		}
 
-		// check for commands
-		if b[0] == byte(0) {
-			// create new connection to client
-			go func() {
-				connectionToClient, e := s.CreateConnection()
-				if e != nil {
-					fmt.Printf("[%s] failed to create new connection\n", e.Error())
-					return
-				}
+		// check how many connections are needed
+		if int(b[0]) > 0 {
+			for i := 0; i < int(b[0]); i++ {
+				// create new connection to client
+				go func() {
+					connectionToClient, e := s.CreateConnection()
+					if e != nil {
+						fmt.Printf("[%s] failed to create new connection\n", e.Error())
+						return
+					}
 
-				// handle connection to client
-				s.HandleConnection(connectionToClient)
-			}()
+					// handle connection to client
+					s.HandleConnection(connectionToClient)
+				}()
+			}
 		}
 
 		// update read deadline
