@@ -12,6 +12,7 @@ type Server struct {
 	MasterConnection           *tls.Conn
 	ActiveConnections          sync.Map
 	CleaningUpMasterConnection bool
+	ClientAddress              string
 }
 
 func (s *Server) Run() {
@@ -20,15 +21,15 @@ func (s *Server) Run() {
 		var e error
 		for {
 			if s.MasterConnection == nil {
-				fmt.Println("creating master connection to client...")
+				fmt.Printf("creating master connection to %s...\n", s.ClientAddress)
 				for s.MasterConnection == nil {
 					s.MasterConnection, e = s.CreateConnection()
 					if e != nil {
-						fmt.Printf("[%s] failed to create new connection\n", e.Error())
+						fmt.Printf("[%s] failed to create new connection to %s\n", e.Error(), s.ClientAddress)
 						time.Sleep(time.Second)
 					}
 				}
-				fmt.Println("stablished master connection to client")
+				fmt.Printf("stablished master connection to %s\n", s.ClientAddress)
 			}
 			time.Sleep(time.Millisecond * 500)
 		}
@@ -71,8 +72,6 @@ func (s *Server) Run() {
 					return
 				}
 
-				fmt.Println("created new connection to client")
-
 				// handle connection to client
 				s.HandleConnection(connectionToClient)
 			}()
@@ -89,7 +88,7 @@ func (s *Server) Run() {
 
 func (s *Server) CreateConnection() (*tls.Conn, error) {
 	// connect to client
-	c, e := tls.DialWithDialer(&net.Dialer{Timeout: time.Second * 3}, "tcp", GlobalConfig.TCPConnect, &GlobalConfig.TLSConfig)
+	c, e := tls.DialWithDialer(&net.Dialer{Timeout: time.Second * 3}, "tcp", s.ClientAddress, &GlobalConfig.TLSConfig)
 	if e != nil {
 		if c != nil {
 			c.Close()

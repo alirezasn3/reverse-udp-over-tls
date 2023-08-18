@@ -97,7 +97,6 @@ func (c *Client) Run() {
 				} else {
 					// add stablished connection to the pool
 					c.ConnectionPool <- conn
-					fmt.Printf("received new connection from server %s\n", conn.RemoteAddr().String())
 				}
 			}(connectionToServer)
 		}
@@ -143,7 +142,6 @@ func (c *Client) Run() {
 			// ask for new connection and handle the first packet
 			go func(firstPacket []byte) {
 				// ask server for new connection
-				fmt.Printf("requesting new connection from server for user %s, %d bytes\n", userAddress.String(), len(firstPacket))
 				_, e = c.MasterConnection.Write([]byte{0})
 				if e != nil {
 					fmt.Printf("[%s] failed to write to master connection, cleaning up...\n", e.Error())

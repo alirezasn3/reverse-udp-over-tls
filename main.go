@@ -4,19 +4,20 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"os"
+	"sync"
 )
 
 var GlobalConfig Config
 
 type Config struct {
-	Role                string `json:"role"`
-	Secret              string `json:"secret"`
-	TCPConnect          string `json:"tcpConnect"`
-	UDPConnect          string `json:"udpConnect"`
-	TCPListen           string `json:"tcpListen"`
-	UDPListen           string `json:"udpListen"`
-	CertificateLocation string `json:"certificateLocation"`
-	KeyLocation         string `json:"keyLocation"`
+	Role                string   `json:"role"`
+	Secret              string   `json:"secret"`
+	TCPConnect          []string `json:"tcpConnect"`
+	UDPConnect          string   `json:"udpConnect"`
+	TCPListen           string   `json:"tcpListen"`
+	UDPListen           string   `json:"udpListen"`
+	CertificateLocation string   `json:"certificateLocation"`
+	KeyLocation         string   `json:"keyLocation"`
 	TLSConfig           tls.Config
 }
 
@@ -56,8 +57,15 @@ func init() {
 
 func main() {
 	if GlobalConfig.Role == "server" {
-		s := Server{}
-		s.Run()
+		var wg sync.WaitGroup
+		for _, clientAddress := range GlobalConfig.TCPConnect {
+			wg.Add(1)
+			go func(a string) {
+				s := Server{ClientAddress: a}
+				s.Run()
+			}(clientAddress)
+		}
+		wg.Wait()
 	} else if GlobalConfig.Role == "client" {
 		c := Client{}
 		c.Run()
