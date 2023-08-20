@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net"
+	"strings"
 	"sync"
 	"time"
 )
@@ -72,6 +73,7 @@ func (c *Client) Run() {
 				if e != nil {
 					fmt.Printf("[%s] failed to set read deadline for the new connection\n", e.Error())
 					conn.Close()
+					return
 				}
 				defer conn.SetDeadline(time.Time{})
 
@@ -81,12 +83,35 @@ func (c *Client) Run() {
 				if e != nil {
 					fmt.Printf("[%s] failed to read secret\n", e.Error())
 					conn.Close()
+					return
 				}
 
 				// check if secret is valid
 				if string(b[:n]) != GlobalConfig.Secret {
+					// check for http methods in first few bytes
+					str := string(b[:n])
+					if strings.Contains(str, "GET") ||
+						strings.Contains(str, "HEAD") ||
+						strings.Contains(str, "POST") ||
+						strings.Contains(str, "PUT") ||
+						strings.Contains(str, "DELETE") ||
+						strings.Contains(str, "CONNECT") ||
+						strings.Contains(str, "OPTIONS") ||
+						strings.Contains(str, "TRACE") ||
+						strings.Contains(str, "PATCH") {
+						_, e = conn.Write([]byte("HTTP/1.1 200 OK\r\nServer: nginx\r\nContent-Type: text/html\r\nContent-Length: 21\r\n\r\n<h1>Hello World!</h1>"))
+						if e != nil {
+							fmt.Printf("[%s] failed to respond to http request from %s\n", e.Error(), conn.RemoteAddr().String())
+							conn.Close()
+							return
+						}
+						conn.Close()
+						fmt.Printf("responded to http request from %s\n", conn.RemoteAddr().String())
+						return
+					}
 					fmt.Printf("invalid secret: %s\n", b[:n])
 					conn.Close()
+					return
 				}
 
 				// send ok packet to server
@@ -94,6 +119,7 @@ func (c *Client) Run() {
 				if e != nil {
 					fmt.Printf("[%s] failed to send secret back to server\n", e.Error())
 					conn.Close()
+					return
 				}
 
 				if c.MasterConnection == nil {
