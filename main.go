@@ -56,6 +56,9 @@ func init() {
 }
 
 func main() {
+	if len(GlobalConfig.Secret) < 8 {
+		panic("secret is too short")
+	}
 	if GlobalConfig.Role == "server" {
 		var wg sync.WaitGroup
 		for _, clientAddress := range GlobalConfig.TCPConnect {
