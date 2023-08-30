@@ -75,7 +75,7 @@ func (c *Client) Run() {
 				b := make([]byte, len(GlobalConfig.Secret))
 				n, e := conn.Read(b)
 				if e != nil {
-					fmt.Printf("[%s] failed to read secret\n", e.Error())
+					fmt.Printf("[%s] failed to read secret from %s\n", e.Error(), conn.RemoteAddr().String())
 					conn.Close()
 					return
 				}
