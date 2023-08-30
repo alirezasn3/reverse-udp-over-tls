@@ -72,7 +72,7 @@ func (c *Client) Run() {
 				defer conn.SetDeadline(time.Time{})
 
 				// read secret from client
-				b := make([]byte, len(GlobalConfig.Secret))
+				b := make([]byte, 8192)
 				n, e := conn.Read(b)
 				if e != nil {
 					fmt.Printf("[%s] failed to read secret from %s\n", e.Error(), conn.RemoteAddr().String())
