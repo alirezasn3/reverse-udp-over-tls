@@ -31,7 +31,7 @@ func (s *Server) Run() {
 				}
 				fmt.Printf("stablished master connection to %s\n", s.ClientAddress)
 			}
-			time.Sleep(time.Millisecond * 500)
+			time.Sleep(time.Millisecond * 100)
 		}
 	}()
 
@@ -63,7 +63,7 @@ func (s *Server) Run() {
 		}
 
 		// create new connection to client
-		if int(b[0]) == 1 {
+		if int(b[0]) == 2 {
 			go func() {
 				connectionToClient, e := s.CreateConnection()
 				if e != nil {
