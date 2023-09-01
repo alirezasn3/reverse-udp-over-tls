@@ -38,11 +38,6 @@ func (c *Client) Run() {
 						continue
 					}
 					c.LastSentKeepAlivePacket = time.Now().UnixMilli()
-					e = c.MasterConnection.SetWriteDeadline(time.Now().Add(time.Second * 5))
-					if e != nil {
-						fmt.Println("failed to set write deadline for master connection")
-						c.CleanUpMasterConnection()
-					}
 				}
 			}
 			time.Sleep(time.Millisecond * 100)
@@ -67,11 +62,6 @@ func (c *Client) Run() {
 			if c.MasterConnection == nil {
 				// use the first connection as the master connection
 				c.MasterConnection = connectionToServer
-				e = c.MasterConnection.SetWriteDeadline(time.Now().Add(time.Second * 5))
-				if e != nil {
-					fmt.Println("failed to set write deadline for master connection")
-					c.CleanUpMasterConnection()
-				}
 				fmt.Println("stablished master connection to server")
 			} else {
 				// add stablished connection to the pool
