@@ -62,21 +62,18 @@ func (s *Server) Run() {
 			continue
 		}
 
-		// check how many connections are needed
-		if int(b[0]) > 0 {
-			for i := 0; i < int(b[0]); i++ {
-				// create new connection to client
-				go func() {
-					connectionToClient, e := s.CreateConnection()
-					if e != nil {
-						fmt.Printf("[%s] failed to create new connection\n", e.Error())
-						return
-					}
+		// create new connection to client
+		if int(b[0]) == 1 {
+			go func() {
+				connectionToClient, e := s.CreateConnection()
+				if e != nil {
+					fmt.Printf("[%s] failed to create new connection\n", e.Error())
+					return
+				}
 
-					// handle connection to client
-					s.HandleConnection(connectionToClient)
-				}()
-			}
+				// handle connection to client
+				s.HandleConnection(connectionToClient)
+			}()
 		}
 
 		// update read deadline
@@ -90,38 +87,8 @@ func (s *Server) Run() {
 
 func (s *Server) CreateConnection() (*tls.Conn, error) {
 	// connect to client
-	c, e := tls.DialWithDialer(&net.Dialer{Timeout: time.Second * 3}, "tcp", s.ClientAddress, &GlobalConfig.TLSConfig)
+	c, e := tls.DialWithDialer(&net.Dialer{Timeout: time.Second * 5}, "tcp", s.ClientAddress, &GlobalConfig.TLSConfig)
 	if e != nil {
-		if c != nil {
-			c.Close()
-		}
-		return nil, e
-	}
-
-	// initialize connection
-	_, e = c.Write([]byte(GlobalConfig.Secret))
-	if e != nil {
-		c.Close()
-		return nil, e
-	}
-
-	// set read deadline for the new connectoin
-	e = c.SetReadDeadline(time.Now().Add(time.Second * 3))
-	if e != nil {
-		c.Close()
-		return nil, e
-	}
-
-	// read first packet from client
-	buffer := make([]byte, len(GlobalConfig.Secret))
-	readBytes, e := c.Read(buffer)
-	if e != nil {
-		if c != nil {
-			c.Close()
-		}
-		return nil, e
-	}
-	if string(buffer[:readBytes]) != GlobalConfig.Secret {
 		if c != nil {
 			c.Close()
 		}
@@ -144,6 +111,8 @@ func (s *Server) CleanUpMasterConnection() {
 	s.MasterConnection.Close()
 	s.MasterConnection = nil
 	s.CleaningUpMasterConnection = false
+
+	fmt.Printf("master connection to %s closed\n", s.ClientAddress)
 }
 
 func (s *Server) HandleConnection(connectionToClient *tls.Conn) {

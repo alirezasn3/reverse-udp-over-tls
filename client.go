@@ -4,7 +4,6 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net"
-	"strings"
 	"sync"
 	"time"
 )
@@ -39,9 +38,14 @@ func (c *Client) Run() {
 						continue
 					}
 					c.LastSentKeepAlivePacket = time.Now().UnixMilli()
+					e = c.MasterConnection.SetWriteDeadline(time.Now().Add(time.Second * 5))
+					if e != nil {
+						fmt.Println("failed to set write deadline for master connection")
+						c.CleanUpMasterConnection()
+					}
 				}
 			}
-			time.Sleep(time.Millisecond * 500)
+			time.Sleep(time.Millisecond * 100)
 		}
 	}()
 
@@ -60,71 +64,19 @@ func (c *Client) Run() {
 				continue
 			}
 
-			// handle new connection on new go routine
-			go func(conn net.Conn) {
-				// set read deadline for the new connection
-				e := conn.SetReadDeadline(time.Now().Add(time.Second * 3))
+			if c.MasterConnection == nil {
+				// use the first connection as the master connection
+				c.MasterConnection = connectionToServer
+				e = c.MasterConnection.SetWriteDeadline(time.Now().Add(time.Second * 5))
 				if e != nil {
-					fmt.Printf("[%s] failed to set read deadline for the new connection\n", e.Error())
-					conn.Close()
-					return
+					fmt.Println("failed to set write deadline for master connection")
+					c.CleanUpMasterConnection()
 				}
-				defer conn.SetDeadline(time.Time{})
-
-				// read secret from client
-				b := make([]byte, 8192)
-				n, e := conn.Read(b)
-				if e != nil {
-					fmt.Printf("[%s] failed to read secret from %s\n", e.Error(), conn.RemoteAddr().String())
-					conn.Close()
-					return
-				}
-
-				// check if secret is valid
-				if string(b[:n]) != GlobalConfig.Secret {
-					// check for http methods in first few bytes
-					str := string(b[:n])
-					if strings.Contains(str, "GET") ||
-						strings.Contains(str, "HEAD") ||
-						strings.Contains(str, "POST") ||
-						strings.Contains(str, "PUT") ||
-						strings.Contains(str, "DELETE") ||
-						strings.Contains(str, "CONNECT") ||
-						strings.Contains(str, "OPTIONS") ||
-						strings.Contains(str, "TRACE") ||
-						strings.Contains(str, "PATCH") {
-						_, e = conn.Write([]byte("HTTP/1.1 200 OK\r\nServer: nginx\r\nContent-Type: text/html\r\nContent-Length: 21\r\n\r\n<h1>Hello World!</h1>"))
-						if e != nil {
-							fmt.Printf("[%s] failed to respond to http request from %s\n", e.Error(), conn.RemoteAddr().String())
-							conn.Close()
-							return
-						}
-						conn.Close()
-						fmt.Printf("responded to http request from %s\n", conn.RemoteAddr().String())
-						return
-					}
-					fmt.Printf("invalid secret: %s\n", b[:n])
-					conn.Close()
-					return
-				}
-
-				// send ok packet to server
-				_, e = conn.Write([]byte(GlobalConfig.Secret))
-				if e != nil {
-					fmt.Printf("[%s] failed to send secret back to server\n", e.Error())
-					conn.Close()
-					return
-				}
-
-				if c.MasterConnection == nil {
-					// use the first connection as the master connection
-					c.MasterConnection = conn
-					fmt.Println("stablished master connection to server")
-				} else {
-					// add stablished connection to the pool
-					c.ConnectionPool <- conn
-				}
-			}(connectionToServer)
+				fmt.Println("stablished master connection to server")
+			} else {
+				// add stablished connection to the pool
+				c.ConnectionPool <- connectionToServer
+			}
 		}
 	}()
 
@@ -188,9 +140,7 @@ func (c *Client) Run() {
 				go func(userAddr *net.UDPAddr, conn net.Conn) {
 					// close connection when done
 					defer func() {
-						if conn != nil {
-							conn.Close()
-						}
+						conn.Close()
 						c.UserAddressToConnectionTable.Delete(userAddress.String())
 					}()
 
