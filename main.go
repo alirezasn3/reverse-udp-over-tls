@@ -11,7 +11,6 @@ var GlobalConfig Config
 
 type Config struct {
 	Role                string   `json:"role"`
-	Secret              string   `json:"secret"`
 	TCPConnect          []string `json:"tcpConnect"`
 	UDPConnect          string   `json:"udpConnect"`
 	TCPListen           string   `json:"tcpListen"`
@@ -56,9 +55,6 @@ func init() {
 }
 
 func main() {
-	if len(GlobalConfig.Secret) < 8 {
-		panic("secret is too short")
-	}
 	if GlobalConfig.Role == "server" {
 		var wg sync.WaitGroup
 		for _, clientAddress := range GlobalConfig.TCPConnect {
