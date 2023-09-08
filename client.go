@@ -1,10 +1,8 @@
 package main
 
 import (
-	"crypto/rand"
 	"crypto/tls"
 	"fmt"
-	random "math/rand"
 	"net"
 	"sync"
 	"time"
@@ -14,6 +12,7 @@ type Client struct {
 	MasterConnection             net.Conn
 	ConnectionPool               chan net.Conn
 	UserAddressToConnectionTable sync.Map
+	LastSentKeepAlivePacket      int64
 	CleaningUpMasterConnection   bool
 }
 
@@ -21,42 +20,27 @@ func (c *Client) Run() {
 	// initialize connection pool
 	c.ConnectionPool = make(chan net.Conn, 1024)
 
+	//
+	c.LastSentKeepAlivePacket = time.Now().UnixMilli()
+
 	// send keep alive packet to server
 	go func() {
 		var e error
-		var n int
+		var diff int64
 		for {
-			if c.MasterConnection != nil {
-				randomBytes := make([]byte, 1024)
-				_, e = rand.Read(randomBytes)
-				if e != nil {
-					panic(e)
-				}
-				e = c.MasterConnection.SetWriteDeadline(time.Now().Add(time.Second * 3))
-				if e != nil {
-					fmt.Printf("[%s] failed to set write deadline for master connection, cleaning up...\n", e.Error())
-					c.CleanUpMasterConnection()
-					continue
-				}
-				n, e = c.MasterConnection.Write(randomBytes)
-				if e != nil {
-					fmt.Printf("[%s] failed to write to master connection, cleaning up...\n", e.Error())
-					c.CleanUpMasterConnection()
-					continue
-				}
-				if n != 1024 {
-					fmt.Printf("[%s] failed to write to master connection, cleaning up...\n", "0 bytes written")
-					c.CleanUpMasterConnection()
-					continue
-				}
-				e = c.MasterConnection.SetWriteDeadline(time.Time{})
-				if e != nil {
-					fmt.Printf("[%s] failed to set write deadline for master connection, cleaning up...\n", e.Error())
-					c.CleanUpMasterConnection()
-					continue
+			diff = time.Now().UnixMilli() - c.LastSentKeepAlivePacket
+			if diff > 2500 {
+				if c.MasterConnection != nil {
+					_, e = c.MasterConnection.Write([]byte{byte(1)})
+					if e != nil {
+						fmt.Printf("[%s] failed to write to master connection, cleaning up...\n", e.Error())
+						c.CleanUpMasterConnection()
+						continue
+					}
+					c.LastSentKeepAlivePacket = time.Now().UnixMilli()
 				}
 			}
-			time.Sleep(time.Millisecond * 1000)
+			time.Sleep(time.Millisecond * 100)
 		}
 	}()
 
@@ -126,17 +110,15 @@ func (c *Client) Run() {
 			// ask for new connection and handle the first packet
 			go func(firstPacket []byte) {
 				// ask server for new connection
-				randomBytes := make([]byte, 1025+random.Intn(1023))
-				_, err := rand.Read(randomBytes)
-				if err != nil {
-					panic(err)
-				}
-				_, e = c.MasterConnection.Write(randomBytes)
+				_, e = c.MasterConnection.Write([]byte{byte(2)})
 				if e != nil {
 					fmt.Printf("[%s] failed to write to master connection, cleaning up...\n", e.Error())
 					c.CleanUpMasterConnection()
 					return
 				}
+
+				// set time for last sent packet
+				c.LastSentKeepAlivePacket = time.Now().UnixMilli()
 
 				// wait for new connection from server
 				connectionToServer := <-c.ConnectionPool
@@ -144,32 +126,36 @@ func (c *Client) Run() {
 				// add new connection to table
 				c.UserAddressToConnectionTable.Store(userAddress.String(), connectionToServer)
 
+				// handle new packets from server on new go routine
+				go func(userAddr *net.UDPAddr, conn net.Conn) {
+					// close connection when done
+					defer func() {
+						conn.Close()
+						c.UserAddressToConnectionTable.Delete(userAddress.String())
+					}()
+
+					// read packts from server
+					b := make([]byte, 1500)
+					var n int
+					var e error
+					for {
+						n, e = conn.Read(b)
+						if e != nil {
+							return
+						}
+						_, e = localListener.WriteToUDP(b[:n], userAddr)
+						if e != nil {
+							return
+						}
+					}
+				}(userAddress, connectionToServer)
+
 				// write the first packet to server
 				_, e = connectionToServer.Write(firstPacket)
 				if e != nil {
 					connectionToServer.Close()
 					c.UserAddressToConnectionTable.Delete(userAddress.String())
-					return
 				}
-
-				// handle new packets from server
-				b := make([]byte, 1500)
-				var n int
-				var e error
-				for {
-					n, e = connectionToServer.Read(b)
-					if e != nil {
-						break
-					}
-					_, e = localListener.WriteToUDP(b[:n], userAddress)
-					if e != nil {
-						break
-					}
-				}
-
-				// close connection when done
-				connectionToServer.Close()
-				c.UserAddressToConnectionTable.Delete(userAddress.String())
 			}(b[:n])
 		}
 	}

@@ -63,13 +63,14 @@ func (s *Server) Run() {
 		}
 
 		// create new connection to client
-		if n > 1024 {
+		if int(b[0]) == 2 {
 			go func() {
 				connectionToClient, e := s.CreateConnection()
 				if e != nil {
 					fmt.Printf("[%s] failed to create new connection\n", e.Error())
 					return
 				}
+
 				// handle connection to client
 				s.HandleConnection(connectionToClient)
 			}()
