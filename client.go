@@ -18,6 +18,9 @@ func (c *Client) Run() {
 	// initialize connection pool
 	c.ConnectionPool = make(chan net.Conn, 1024)
 
+	// initialize connections table
+	c.UserAddressToConnectionTable = make(map[string]net.Conn)
+
 	// send keep alive packet to server
 	go func() {
 		d := time.Second * 3
@@ -118,9 +121,9 @@ func (c *Client) Run() {
 
 		// check if user has connection to server
 		if conn, ok := c.UserAddressToConnectionTable[userAddress.String()]; ok {
-			_, e = conn.(net.Conn).Write(b[:n])
+			_, e = conn.Write(b[:n])
 			if e != nil {
-				conn.(net.Conn).Close()
+				conn.Close()
 				delete(c.UserAddressToConnectionTable, userAddress.String())
 			}
 		} else {
