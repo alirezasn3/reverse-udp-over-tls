@@ -4,14 +4,13 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net"
-	"sync"
 	"time"
 )
 
 type Client struct {
 	MasterConnection             net.Conn
 	ConnectionPool               chan net.Conn
-	UserAddressToConnectionTable sync.Map
+	UserAddressToConnectionTable map[string]net.Conn
 	CleaningUpMasterConnection   bool
 }
 
@@ -111,18 +110,18 @@ func (c *Client) Run() {
 		// read packet from user
 		n, userAddress, e := localListener.ReadFromUDP(b)
 		if e != nil {
-			if conn, ok := c.UserAddressToConnectionTable.LoadAndDelete(userAddress.String()); ok {
-				conn.(net.Conn).Close()
+			if conn, ok := c.UserAddressToConnectionTable[userAddress.String()]; ok {
+				conn.Close()
 			}
 			continue
 		}
 
 		// check if user has connection to server
-		if conn, ok := c.UserAddressToConnectionTable.Load(userAddress.String()); ok {
+		if conn, ok := c.UserAddressToConnectionTable[userAddress.String()]; ok {
 			_, e = conn.(net.Conn).Write(b[:n])
 			if e != nil {
 				conn.(net.Conn).Close()
-				c.UserAddressToConnectionTable.Delete(userAddress.String())
+				delete(c.UserAddressToConnectionTable, userAddress.String())
 			}
 		} else {
 			// check master connection
@@ -131,50 +130,48 @@ func (c *Client) Run() {
 			}
 
 			// ask for new connection and handle the first packet
-			go func(firstPacket []byte) {
-				// ask server for new connection
-				_, e = c.MasterConnection.Write([]byte{byte(2)})
-				if e != nil {
-					fmt.Printf("[%s] failed to write to master connection, cleaning up...\n", e.Error())
-					c.CleanUpMasterConnection()
-					return
-				}
+			// ask server for new connection
+			_, e = c.MasterConnection.Write([]byte{byte(2)})
+			if e != nil {
+				fmt.Printf("[%s] failed to write to master connection, cleaning up...\n", e.Error())
+				c.CleanUpMasterConnection()
+				return
+			}
 
-				// wait for new connection from server
-				connectionToServer := <-c.ConnectionPool
+			// wait for new connection from server
+			connectionToServer := <-c.ConnectionPool
 
-				// add new connection to table
-				c.UserAddressToConnectionTable.Store(userAddress.String(), connectionToServer)
+			// add new connection to table
+			c.UserAddressToConnectionTable[userAddress.String()] = connectionToServer
 
-				// handle new packets from server on new go routine
-				go func(userAddr *net.UDPAddr, conn net.Conn) {
-					// close connection when done
-					defer c.UserAddressToConnectionTable.Delete(userAddress.String())
-					defer conn.Close()
-
-					// read packts from server
-					b := make([]byte, 1500)
-					var n int
-					var e error
-					for {
-						n, e = conn.Read(b)
-						if e != nil {
-							return
-						}
-						_, e = localListener.WriteToUDP(b[:n], userAddr)
-						if e != nil {
-							return
-						}
-					}
-				}(userAddress, connectionToServer)
-
+			// handle new packets from server on new go routine
+			go func(userAddr *net.UDPAddr, conn net.Conn, firstPacket []byte) {
 				// write the first packet to server
 				_, e = connectionToServer.Write(firstPacket)
 				if e != nil {
 					connectionToServer.Close()
-					c.UserAddressToConnectionTable.Delete(userAddress.String())
+					delete(c.UserAddressToConnectionTable, userAddress.String())
 				}
-			}(b[:n])
+
+				// close connection when done
+				defer delete(c.UserAddressToConnectionTable, userAddress.String())
+				defer conn.Close()
+
+				// read packts from server
+				b := make([]byte, 1500)
+				var n int
+				var e error
+				for {
+					n, e = conn.Read(b)
+					if e != nil {
+						return
+					}
+					_, e = localListener.WriteToUDP(b[:n], userAddr)
+					if e != nil {
+						return
+					}
+				}
+			}(userAddress, connectionToServer, b[:n])
 		}
 	}
 }
