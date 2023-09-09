@@ -12,7 +12,6 @@ type Client struct {
 	MasterConnection             net.Conn
 	ConnectionPool               chan net.Conn
 	UserAddressToConnectionTable sync.Map
-	LastSentKeepAlivePacket      int64
 	CleaningUpMasterConnection   bool
 }
 
@@ -20,25 +19,49 @@ func (c *Client) Run() {
 	// initialize connection pool
 	c.ConnectionPool = make(chan net.Conn, 1024)
 
-	//
-	c.LastSentKeepAlivePacket = time.Now().UnixMilli()
-
 	// send keep alive packet to server
 	go func() {
+		d := time.Second * 3
 		var e error
-		var diff int64
 		for {
-			diff = time.Now().UnixMilli() - c.LastSentKeepAlivePacket
-			if diff > 2500 {
-				if c.MasterConnection != nil {
-					_, e = c.MasterConnection.Write([]byte{byte(1)})
-					if e != nil {
-						fmt.Printf("[%s] failed to write to master connection, cleaning up...\n", e.Error())
-						c.CleanUpMasterConnection()
-						continue
-					}
-					c.LastSentKeepAlivePacket = time.Now().UnixMilli()
+			if c.MasterConnection != nil {
+				e = c.MasterConnection.SetWriteDeadline(time.Now().Add(d))
+				if e != nil {
+					fmt.Printf("[%s] failed to set write deadline for master connection, cleaning up...\n", e.Error())
+					c.CleanUpMasterConnection()
+					continue
 				}
+				_, e = c.MasterConnection.Write([]byte{byte(1)})
+				if e != nil {
+					fmt.Printf("[%s] failed to write to master connection, cleaning up...\n", e.Error())
+					c.CleanUpMasterConnection()
+					continue
+				}
+				e = c.MasterConnection.SetWriteDeadline(time.Time{})
+				if e != nil {
+					fmt.Printf("[%s] failed to clear write deadline for master connection, cleaning up...\n", e.Error())
+					c.CleanUpMasterConnection()
+					continue
+				}
+				e = c.MasterConnection.SetReadDeadline(time.Now().Add(d))
+				if e != nil {
+					fmt.Printf("[%s] failed to set read deadline for master connection, cleaning up...\n", e.Error())
+					c.CleanUpMasterConnection()
+					continue
+				}
+				_, e = c.MasterConnection.Read(nil)
+				if e != nil {
+					fmt.Printf("[%s] failed to read pong packet from master connection, cleaning up...\n", e.Error())
+					c.CleanUpMasterConnection()
+					continue
+				}
+				e = c.MasterConnection.SetReadDeadline(time.Time{})
+				if e != nil {
+					fmt.Printf("[%s] failed to clear read deadline for master connection, cleaning up...\n", e.Error())
+					c.CleanUpMasterConnection()
+					continue
+				}
+				time.Sleep(time.Millisecond * 1000)
 			}
 			time.Sleep(time.Millisecond * 100)
 		}
@@ -117,9 +140,6 @@ func (c *Client) Run() {
 					return
 				}
 
-				// set time for last sent packet
-				c.LastSentKeepAlivePacket = time.Now().UnixMilli()
-
 				// wait for new connection from server
 				connectionToServer := <-c.ConnectionPool
 
@@ -129,10 +149,8 @@ func (c *Client) Run() {
 				// handle new packets from server on new go routine
 				go func(userAddr *net.UDPAddr, conn net.Conn) {
 					// close connection when done
-					defer func() {
-						conn.Close()
-						c.UserAddressToConnectionTable.Delete(userAddress.String())
-					}()
+					defer c.UserAddressToConnectionTable.Delete(userAddress.String())
+					defer conn.Close()
 
 					// read packts from server
 					b := make([]byte, 1500)

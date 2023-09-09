@@ -30,13 +30,20 @@ func (s *Server) Run() {
 					}
 				}
 				fmt.Printf("stablished master connection to %s\n", s.ClientAddress)
+
+				// update read deadline
+				e = s.MasterConnection.SetReadDeadline(time.Now().Add(time.Second * 3))
+				if e != nil {
+					fmt.Printf("[%s] failed to set read deadline, cleaning up...\n", e.Error())
+					s.CleanUpMasterConnection()
+				}
 			}
 			time.Sleep(time.Millisecond * 100)
 		}
 	}()
 
 	// initialize loop vars
-	d := time.Second * 5
+	d := time.Second * 3
 	b := make([]byte, 1)
 	var e error
 	var n int
@@ -62,8 +69,14 @@ func (s *Server) Run() {
 			continue
 		}
 
-		// create new connection to client
-		if int(b[0]) == 2 {
+		if int(b[0]) == 1 { // respond to ping
+			_, e = s.MasterConnection.Write([]byte{})
+			if e != nil {
+				fmt.Printf("[%s] failed to respond to ping message, cleaning up...\n", e.Error())
+				s.CleanUpMasterConnection()
+				continue
+			}
+		} else if int(b[0]) == 2 { // create new connection to client
 			go func() {
 				connectionToClient, e := s.CreateConnection()
 				if e != nil {
@@ -89,9 +102,6 @@ func (s *Server) CreateConnection() (*tls.Conn, error) {
 	// connect to client
 	c, e := tls.DialWithDialer(&net.Dialer{Timeout: time.Second * 5}, "tcp", s.ClientAddress, &GlobalConfig.TLSConfig)
 	if e != nil {
-		if c != nil {
-			c.Close()
-		}
 		return nil, e
 	}
 
@@ -116,6 +126,9 @@ func (s *Server) CleanUpMasterConnection() {
 }
 
 func (s *Server) HandleConnection(connectionToClient *tls.Conn) {
+	// close connection to client when done
+	defer connectionToClient.Close()
+
 	// parse local service address
 	localServiceAddress, err := net.ResolveUDPAddr("udp4", GlobalConfig.UDPConnect)
 	if err != nil {
@@ -127,27 +140,21 @@ func (s *Server) HandleConnection(connectionToClient *tls.Conn) {
 	connectionToLocalService, err := net.DialUDP("udp4", nil, localServiceAddress)
 	if err != nil {
 		fmt.Println(err)
-		if connectionToLocalService != nil {
-			connectionToLocalService.Close()
-		}
 		return
 	}
-
-	// close connections when done
-	defer func() {
-		if connectionToLocalService != nil {
-			connectionToLocalService.Close()
-		}
-		if connectionToClient != nil {
-			connectionToClient.Close()
-		}
-	}()
+	defer connectionToLocalService.Close()
 
 	// timeout
 	d := time.Hour
 
+	// create wait group
+	var wg sync.WaitGroup
+
 	// handle incoming packets from client
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
+		defer wg.Done()
 		b := make([]byte, 1500)
 		var n int
 		var e error
@@ -173,25 +180,33 @@ func (s *Server) HandleConnection(connectionToClient *tls.Conn) {
 	}()
 
 	// handle incoming packets from local service
-	b := make([]byte, 1500)
-	var n int
-	var e error
-	for {
-		// set read deadline
-		e = connectionToLocalService.SetReadDeadline(time.Now().Add(d))
-		if e != nil {
-			return
-		}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		defer wg.Done()
+		b := make([]byte, 1500)
+		var n int
+		var e error
+		for {
+			// set read deadline
+			e = connectionToLocalService.SetReadDeadline(time.Now().Add(d))
+			if e != nil {
+				return
+			}
 
-		// read packet from local service
-		n, e = connectionToLocalService.Read(b)
-		if e != nil {
-			return
+			// read packet from local service
+			n, e = connectionToLocalService.Read(b)
+			if e != nil {
+				return
+			}
+
+			// write packet to client
+			_, e = connectionToClient.Write(b[:n])
+			if e != nil {
+				return
+			}
 		}
-		// write packet to client
-		_, e = connectionToClient.Write(b[:n])
-		if e != nil {
-			return
-		}
-	}
+	}()
+
+	wg.Wait()
 }
