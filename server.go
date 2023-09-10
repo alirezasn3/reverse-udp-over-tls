@@ -70,7 +70,7 @@ func (s *Server) Run() {
 		}
 
 		if int(b[0]) == 1 { // respond to ping
-			_, e = s.MasterConnection.Write([]byte{})
+			_, e = s.MasterConnection.Write([]byte{1})
 			if e != nil {
 				fmt.Printf("[%s] failed to respond to ping message, cleaning up...\n", e.Error())
 				s.CleanUpMasterConnection()
@@ -147,14 +147,8 @@ func (s *Server) HandleConnection(connectionToClient *tls.Conn) {
 	// timeout
 	d := time.Hour
 
-	// create wait group
-	var wg sync.WaitGroup
-
 	// handle incoming packets from client
-	wg.Add(1)
 	go func() {
-		defer wg.Done()
-		defer wg.Done()
 		b := make([]byte, 1500)
 		var n int
 		var e error
@@ -180,33 +174,26 @@ func (s *Server) HandleConnection(connectionToClient *tls.Conn) {
 	}()
 
 	// handle incoming packets from local service
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		defer wg.Done()
-		b := make([]byte, 1500)
-		var n int
-		var e error
-		for {
-			// set read deadline
-			e = connectionToLocalService.SetReadDeadline(time.Now().Add(d))
-			if e != nil {
-				return
-			}
-
-			// read packet from local service
-			n, e = connectionToLocalService.Read(b)
-			if e != nil {
-				return
-			}
-
-			// write packet to client
-			_, e = connectionToClient.Write(b[:n])
-			if e != nil {
-				return
-			}
+	b := make([]byte, 1500)
+	var n int
+	var e error
+	for {
+		// set read deadline
+		e = connectionToLocalService.SetReadDeadline(time.Now().Add(d))
+		if e != nil {
+			return
 		}
-	}()
 
-	wg.Wait()
+		// read packet from local service
+		n, e = connectionToLocalService.Read(b)
+		if e != nil {
+			return
+		}
+
+		// write packet to client
+		_, e = connectionToClient.Write(b[:n])
+		if e != nil {
+			return
+		}
+	}
 }
