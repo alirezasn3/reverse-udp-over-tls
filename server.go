@@ -3,26 +3,27 @@ package main
 import (
 	"crypto/tls"
 	"fmt"
+	"io"
 	"net"
-	"sync"
 	"time"
 )
 
 type Server struct {
-	MasterConnection           *tls.Conn
-	ActiveConnections          sync.Map
-	CleaningUpMasterConnection bool
-	ClientAddress              string
+	ClientAddress string
 }
 
 func (s *Server) Run() {
 	for {
 		connectionToClient, e := s.CreateConnection()
 		if e != nil {
-			fmt.Printf("[%s] failed to create new connection\n", e.Error())
+			if e != io.EOF {
+				fmt.Printf("[%s] failed to create new connection\n", e.Error())
+			}
 			time.Sleep(time.Second)
 			continue
 		}
+
+		fmt.Println("created new connection to client")
 
 		// handle connection to client on new go routine
 		go s.HandleConnection(connectionToClient)
@@ -33,13 +34,10 @@ func (s *Server) Run() {
 
 func (s *Server) CreateConnection() (*tls.Conn, error) {
 	// connect to client
-	c, e := tls.DialWithDialer(&net.Dialer{Timeout: time.Second * 5}, "tcp", s.ClientAddress, &GlobalConfig.TLSConfig)
+	c, e := tls.DialWithDialer(&net.Dialer{Timeout: time.Second * 3}, "tcp", s.ClientAddress, &GlobalConfig.TLSConfig)
 	if e != nil {
 		return nil, e
 	}
-
-	// store created connection in active connections map
-	s.ActiveConnections.Store(c.LocalAddr().String(), c)
 
 	return c, nil
 }
