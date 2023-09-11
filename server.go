@@ -16,85 +16,18 @@ type Server struct {
 }
 
 func (s *Server) Run() {
-	// keep master connection alive and reconnect if needed
-	go func() {
-		var e error
-		for {
-			if s.MasterConnection == nil {
-				fmt.Printf("creating master connection to %s...\n", s.ClientAddress)
-				for s.MasterConnection == nil {
-					s.MasterConnection, e = s.CreateConnection()
-					if e != nil {
-						fmt.Printf("[%s] failed to create new connection to %s\n", e.Error(), s.ClientAddress)
-						time.Sleep(time.Second)
-					}
-				}
-				fmt.Printf("stablished master connection to %s\n", s.ClientAddress)
-
-				// update read deadline
-				e = s.MasterConnection.SetReadDeadline(time.Now().Add(time.Second * 3))
-				if e != nil {
-					fmt.Printf("[%s] failed to set read deadline, cleaning up...\n", e.Error())
-					s.CleanUpMasterConnection()
-				}
-			}
-			time.Sleep(time.Millisecond * 100)
-		}
-	}()
-
-	// initialize loop vars
-	d := time.Second * 3
-	b := make([]byte, 1)
-	var e error
-	var n int
-
-	// read from master connection
 	for {
-		// check if master connection exists
-		if s.MasterConnection == nil {
-			time.Sleep(time.Millisecond * 100)
-			continue
-		}
-
-		// read packet
-		n, e = s.MasterConnection.Read(b)
+		connectionToClient, e := s.CreateConnection()
 		if e != nil {
-			fmt.Printf("[%s] failed to read from master connection, cleaning up...\n", e.Error())
-			s.CleanUpMasterConnection()
-			continue
-		}
-		if n == 0 {
-			fmt.Println("read 0 bytes from master connection, cleaning up...")
-			s.CleanUpMasterConnection()
+			fmt.Printf("[%s] failed to create new connection\n", e.Error())
+			time.Sleep(time.Second)
 			continue
 		}
 
-		if int(b[0]) == 1 { // respond to ping
-			_, e = s.MasterConnection.Write([]byte{1})
-			if e != nil {
-				fmt.Printf("[%s] failed to respond to ping message, cleaning up...\n", e.Error())
-				s.CleanUpMasterConnection()
-				continue
-			}
-		} else if int(b[0]) == 2 { // create new connection to client
-			go func() {
-				connectionToClient, e := s.CreateConnection()
-				if e != nil {
-					fmt.Printf("[%s] failed to create new connection\n", e.Error())
-					return
-				}
+		// handle connection to client on new go routine
+		go s.HandleConnection(connectionToClient)
 
-				// handle connection to client
-				s.HandleConnection(connectionToClient)
-			}()
-		}
-
-		// update read deadline
-		e = s.MasterConnection.SetReadDeadline(time.Now().Add(d))
-		if e != nil {
-			fmt.Printf("[%s] failed to set read deadline, cleaning up...\n", e.Error())
-			s.CleanUpMasterConnection()
-		}
+		time.Sleep(time.Millisecond * 100)
 	}
 }
 
@@ -109,20 +42,6 @@ func (s *Server) CreateConnection() (*tls.Conn, error) {
 	s.ActiveConnections.Store(c.LocalAddr().String(), c)
 
 	return c, nil
-}
-
-func (s *Server) CleanUpMasterConnection() {
-	// check if master connection exists and not already closing
-	if s.CleaningUpMasterConnection || s.MasterConnection == nil {
-		return
-	}
-
-	s.CleaningUpMasterConnection = true
-	s.MasterConnection.Close()
-	s.MasterConnection = nil
-	s.CleaningUpMasterConnection = false
-
-	fmt.Printf("master connection to %s closed\n", s.ClientAddress)
 }
 
 func (s *Server) HandleConnection(connectionToClient *tls.Conn) {
