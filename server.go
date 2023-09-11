@@ -2,9 +2,11 @@ package main
 
 import (
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"io"
 	"net"
+	"syscall"
 	"time"
 )
 
@@ -16,7 +18,7 @@ func (s *Server) Run() {
 	for {
 		connectionToClient, e := s.CreateConnection()
 		if e != nil {
-			if e != io.EOF {
+			if e != io.EOF && !errors.Is(e, syscall.ECONNRESET) {
 				fmt.Printf("[%s] failed to create new connection\n", e.Error())
 			}
 			time.Sleep(time.Second)
