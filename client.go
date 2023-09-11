@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net"
+	"net/netip"
 )
 
 type Client struct {
@@ -62,7 +63,7 @@ func (c *Client) Run() {
 	b := make([]byte, 1500)
 	for {
 		// read packet from user
-		n, userAddress, e := localListener.ReadFromUDP(b)
+		n, userAddress, e := localListener.ReadFromUDPAddrPort(b)
 		if e != nil {
 			if conn, ok := c.UserAddressToConnectionTable[userAddress.String()]; ok {
 				conn.Close()
@@ -90,7 +91,7 @@ func (c *Client) Run() {
 			c.UserAddressToConnectionTable[userAddress.String()] = connectionToServer
 
 			// handle new packets from server on new go routine
-			go func(userAddr *net.UDPAddr, conn net.Conn, firstPacket []byte) {
+			go func(userAddr netip.AddrPort, conn net.Conn, firstPacket []byte) {
 				// write the first packet to server
 				_, e = connectionToServer.Write(firstPacket)
 				if e != nil {
@@ -111,7 +112,7 @@ func (c *Client) Run() {
 					if e != nil {
 						return
 					}
-					_, e = localListener.WriteToUDP(b[:n], userAddr)
+					_, e = localListener.WriteToUDPAddrPort(b[:n], userAddr)
 					if e != nil {
 						return
 					}
