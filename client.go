@@ -7,6 +7,16 @@ import (
 	"net/netip"
 )
 
+func addrPortToString(a netip.AddrPort) string {
+	ip := a.Addr().As4()
+	p := a.Port()
+	b := make([]byte, 0, 6)
+	for i := range ip {
+		b = append(b, ip[i])
+	}
+	return string(append(b, byte(p), byte(p>>8)))
+}
+
 type Client struct {
 	ConnectionPool               chan net.Conn
 	UserAddressToConnectionTable map[string]net.Conn
@@ -65,19 +75,19 @@ func (c *Client) Run() {
 		// read packet from user
 		n, userAddress, e := localListener.ReadFromUDPAddrPort(b)
 		if e != nil {
-			if conn, ok := c.UserAddressToConnectionTable[userAddress.String()]; ok {
+			if conn, ok := c.UserAddressToConnectionTable[addrPortToString(userAddress)]; ok {
 				conn.Close()
-				delete(c.UserAddressToConnectionTable, userAddress.String())
+				delete(c.UserAddressToConnectionTable, addrPortToString(userAddress))
 			}
 			continue
 		}
 
 		// check if user has connection to server
-		if conn, ok := c.UserAddressToConnectionTable[userAddress.String()]; ok {
+		if conn, ok := c.UserAddressToConnectionTable[addrPortToString(userAddress)]; ok {
 			_, e = conn.Write(b[:n])
 			if e != nil {
 				conn.Close()
-				delete(c.UserAddressToConnectionTable, userAddress.String())
+				delete(c.UserAddressToConnectionTable, addrPortToString(userAddress))
 			}
 		} else {
 			c.WaitingForConnection = true
@@ -88,19 +98,21 @@ func (c *Client) Run() {
 			c.WaitingForConnection = false
 
 			// add new connection to table
-			c.UserAddressToConnectionTable[userAddress.String()] = connectionToServer
+			c.UserAddressToConnectionTable[addrPortToString(userAddress)] = connectionToServer
 
 			// handle new packets from server on new go routine
 			go func(userAddr netip.AddrPort, conn net.Conn, firstPacket []byte) {
+				fmt.Printf("accepted new connection from %s for %s\n", conn.RemoteAddr(), userAddr)
+
 				// write the first packet to server
 				_, e = connectionToServer.Write(firstPacket)
 				if e != nil {
 					connectionToServer.Close()
-					delete(c.UserAddressToConnectionTable, userAddress.String())
+					delete(c.UserAddressToConnectionTable, addrPortToString(userAddress))
 				}
 
 				// close connection when done
-				defer delete(c.UserAddressToConnectionTable, userAddress.String())
+				defer delete(c.UserAddressToConnectionTable, addrPortToString(userAddress))
 				defer conn.Close()
 
 				// read packts from server

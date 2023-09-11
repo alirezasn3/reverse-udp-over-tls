@@ -15,28 +15,26 @@ type Server struct {
 }
 
 func (s *Server) Run() {
+	lastLog := time.Now()
 	for {
 		connectionToClient, e := s.CreateConnection()
 		if e != nil {
-			if e != io.EOF && !errors.Is(e, syscall.ECONNRESET) {
-				fmt.Printf("[%s] failed to create new connection\n", e.Error())
+			if e != io.EOF && !errors.Is(e, syscall.ECONNRESET) && time.Since(lastLog).Milliseconds() > 1000 {
+				fmt.Printf("[%s] failed to create new connection to %s\n", e.Error(), s.ClientAddress)
 			}
-			time.Sleep(time.Second)
-			continue
+		} else {
+			fmt.Printf("created new connection to client to %s\n", s.ClientAddress)
+
+			// handle connection to client on new go routine
+			go s.HandleConnection(connectionToClient)
 		}
-
-		fmt.Println("created new connection to client")
-
-		// handle connection to client on new go routine
-		go s.HandleConnection(connectionToClient)
-
-		time.Sleep(time.Millisecond * 100)
+		time.Sleep(time.Millisecond * 200)
 	}
 }
 
 func (s *Server) CreateConnection() (*tls.Conn, error) {
 	// connect to client
-	c, e := tls.DialWithDialer(&net.Dialer{Timeout: time.Second * 3}, "tcp", s.ClientAddress, &GlobalConfig.TLSConfig)
+	c, e := tls.DialWithDialer(&net.Dialer{Timeout: time.Second * 1}, "tcp", s.ClientAddress, &GlobalConfig.TLSConfig)
 	if e != nil {
 		return nil, e
 	}
