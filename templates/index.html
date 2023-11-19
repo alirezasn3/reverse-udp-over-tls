@@ -8,13 +8,32 @@
   <title>Tunnel Stats</title>
 </head>
 
-<body class="bg-gray-800 text-gray-100 w-[100vw] min-h-[100svh]">
-  <div class="flex flex-col w-full p-4 max-w-3xl mx-auto mb-4 bg-slate-900">
-    total
+<body class="bg-gray-800 text-gray-100 w-[100vw] min-h-[100svh] p-4">
+  <div class="flex flex-col p-4 rounded shadow-sm w-full max-w-3xl mx-auto bg-slate-900">
+    <div class="flex mb-1">
+      <div class="w-1/2 flex">
+        <div class="mr-1">Total Download : </div>
+        <div id="total-download">{{ .TotalDownload }}</div>
+      </div>
+      <div class="w-1/2 flex">
+        <div class="mr-1">Current Download : </div>
+        <div id="current-download">{{ .CurrentDownload }}</div>
+      </div>
+    </div>
+    <div class="flex">
+      <div class="w-1/2 flex">
+        <div class="mr-1">Total Upload : </div>
+        <div id="total-upload">{{ .TotalUpload }}</div>
+      </div>
+      <div class="w-1/2 flex">
+        <div class="mr-1">Current Upload : </div>
+        <div id="current-upload">{{ .CurrentUpload }}</div>
+      </div>
+    </div>
   </div>
-  <div class="flex flex-col w-full p-4 max-w-3xl mx-auto">
+  <div class="flex flex-col w-full max-w-3xl mx-auto">
     {{ range .servers }}
-    <div class="client w-full p-4 my-4 bg-gray-900 rounded shadow-sm flex flex-col">
+    <div class="client w-full my-4 p-4 bg-gray-900 rounded shadow-sm flex flex-col">
       <div class="flex flex-col text-lg">
         <div class="font-bold text-2xl mb-1">Client</div>
         <div class="flex">
@@ -113,7 +132,7 @@
     };
     ws.onmessage = ({ data }) => {
       console.log("message");
-      const { servers } = JSON.parse(data);
+      const { servers, totalDownload, totalUpload, currentDownload, currentUpload } = JSON.parse(data);
       servers.forEach((s) => {
         document.getElementById(`${s.ClientAddress}-status`).textContent = s.Status
         document.getElementById(`${s.ClientAddress}-total-download`).textContent = formatBytes(s.TotalDownload)
@@ -125,6 +144,10 @@
         document.getElementById(`${s.ClientAddress}-active-connections`).textContent = s.ActiveConnections
         document.getElementById(`${s.ClientAddress}-latest-connection`).textContent = formatSeconds(s.LatestConnection)
       });
+      document.getElementById(`total-download`).textContent = formatBytes(totalDownload)
+      document.getElementById(`total-upload`).textContent = formatBytes(totalUpload)
+      document.getElementById(`current-download`).textContent = formatBytes(currentDownload)
+      document.getElementById(`current-upload`).textContent = formatBytes(currentUpload)
     };
     ws.onclose = () => {
       console.log("ws closed");
