@@ -29,6 +29,7 @@ type Config struct {
 	MonitorAddress      string   `json:"monitorAddress"`
 	CertificateLocation string   `json:"certificateLocation"`
 	KeyLocation         string   `json:"keyLocation"`
+	TemplatesLocation   string   `json:"templatesLocation"`
 	TLSConfig           tls.Config
 }
 
@@ -99,7 +100,7 @@ func main() {
 		wg.Add(1)
 		go func() {
 			router := gin.Default()
-			router.LoadHTMLGlob("templates/*")
+			router.LoadHTMLGlob(GlobalConfig.TemplatesLocation)
 			router.GET("/", func(c *gin.Context) {
 				c.HTML(http.StatusOK, "index.html", gin.H{
 					"servers":             servers,
