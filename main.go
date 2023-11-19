@@ -93,7 +93,7 @@ func main() {
 					totalDwonload += s.TotalDownload
 					totalUpload += s.TotalUpload
 					CurrentDownload += s.CurrentDownload
-					s.CurrentUpload += s.CurrentDownload
+					CurrentUpload += s.CurrentUpload
 				}
 			}
 		}()
