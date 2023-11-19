@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <title>Tunnel Stats</title>
+</head>
+
+<body class="bg-gray-800 text-gray-100 w-[100vw] min-h-[100svh]">
+  <div class="flex flex-col w-full p-4 max-w-3xl mx-auto mb-4 bg-slate-900">
+    total
+  </div>
+  <div class="flex flex-col w-full p-4 max-w-3xl mx-auto">
+    {{ range .servers }}
+    <div class="client w-full p-4 my-4 bg-gray-900 rounded shadow-sm flex flex-col">
+      <div class="flex flex-col text-lg">
+        <div class="font-bold text-2xl mb-1">Client</div>
+        <div class="flex">
+          <div class="mr-1"> Address : </div>
+          <div> {{ .ClientAddress }} </div>
+        </div>
+        <div class="flex">
+          <div class="mr-1">Status : </div>
+          <div id="{{ .ClientAddress }}-status">{{ .Status }}</div>
+        </div>
+      </div>
+      <div class="w-full mx-1 bg-gray-800 h-0.5 my-2"></div>
+      <div class="flex flex-col text-lg w-full">
+        <div class="font-bold text-2xl mb-1">Bandwidth</div>
+        <div class="w-full flex">
+          <div class="w-1/2 flex">
+            <div class="mr-1">Total Download : </div>
+            <div id="{{ .ClientAddress }}-total-download">{{ .TotalDownload }}</div>
+          </div>
+          <div class="w-1/2 flex">
+            <div class="mr-1">Current Download : </div>
+            <div id="{{ .ClientAddress }}-current-download">{{ .CurrentDownload }}</div>
+          </div>
+        </div>
+        <div class="flex">
+          <div class="w-1/2 flex">
+            <div class="mr-1">Total Upload : </div>
+            <div id="{{ .ClientAddress }}-total-upload">{{ .TotalUpload }}</div>
+          </div>
+          <div class="w-1/2 flex">
+            <div class="mr-1">Current Upload : </div>
+            <div id="{{ .ClientAddress }}-current-upload">{{ .CurrentUpload }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="w-full mx-1 bg-gray-800 h-0.5 my-2"></div>
+      <div class="flex flex-col text-lg">
+        <div class="font-bold text-2xl mb-1">Connections</div>
+        <div class="flex">
+          <div class="w-1/2 flex">
+            <div class="mr-1">Attempted Connections : </div>
+            <div id="{{ .ClientAddress }}-attempted-connections">{{ .AttemptedConnections }}</div>
+          </div>
+          <div class="w-1/2 flex">
+            <div class="mr-1">Accepted Connections : </div>
+            <div id="{{ .ClientAddress }}-accepted-connections">{{ .AcceptedConnections }}</div>
+          </div>
+        </div>
+        <div class="flex">
+          <div class="w-1/2 flex">
+            <div class="mr-1">Active Connections : </div>
+            <div id="{{ .ClientAddress }}-active-connections">{{ .ActiveConnections }}</div>
+          </div>
+          <div class="w-1/2 flex">
+            <div class="mr-1">Lastest Connection : </div>
+            <div id="{{ .ClientAddress }}-latest-connection">{{ .LatestConnection }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {{ end }}
+  </div>
+
+  <script defer>
+    function formatSeconds(totalSeconds, noPrefix = false) {
+      if (!totalSeconds) return "unknown";
+      totalSeconds = Math.trunc(totalSeconds - Date.now() / 1000);
+      const prefix = totalSeconds < 0 && !noPrefix ? "-" : "";
+      totalSeconds = Math.abs(totalSeconds);
+      if (totalSeconds / 60 < 1) return `${prefix}${totalSeconds} seconds`;
+      const totalMinutes = Math.trunc(totalSeconds / 60);
+      if (totalMinutes / 60 < 1) return `${prefix}${totalMinutes} minutes`;
+      const totalHours = Math.trunc(totalMinutes / 60);
+      if (totalHours / 24 < 1) return `${prefix}${totalHours} hours`;
+      return `${prefix}${Math.trunc(totalHours / 24)} days`;
+    }
+
+    function formatBytes(totalBytes) {
+      if (!totalBytes) return "00.00 KB";
+      const totalKilos = totalBytes / 1024;
+      const totalMegas = totalKilos / 1000;
+      const totalGigas = totalMegas / 1000;
+      const totalTeras = totalGigas / 1000;
+      if (totalKilos < 100)
+        return `${totalKilos < 10 ? "0" : ""}${totalKilos.toFixed(2)} KB`;
+      if (totalMegas < 100)
+        return `${totalMegas < 10 ? "0" : ""}${totalMegas.toFixed(2)} MB`;
+      if (totalGigas < 100)
+        return `${totalGigas < 10 ? "0" : ""}${totalGigas.toFixed(2)} GB`;
+      return `${totalTeras < 10 ? "0" : ""}${totalTeras.toFixed(2)} TB`;
+    }
+
+    var ws = new WebSocket(`ws://${window.location.host}/ws`);
+    ws.onopen = () => {
+      console.log("ws opend");
+    };
+    ws.onmessage = ({ data }) => {
+      console.log("message");
+      const { servers } = JSON.parse(data);
+      servers.forEach((s) => {
+        document.getElementById(`${s.ClientAddress}-status`).textContent = s.Status
+        document.getElementById(`${s.ClientAddress}-total-download`).textContent = formatBytes(s.TotalDownload)
+        document.getElementById(`${s.ClientAddress}-total-upload`).textContent = formatBytes(s.TotalUpload)
+        document.getElementById(`${s.ClientAddress}-current-download`).textContent = formatBytes(s.CurrentDownload)
+        document.getElementById(`${s.ClientAddress}-current-upload`).textContent = formatBytes(s.CurrentUpload)
+        document.getElementById(`${s.ClientAddress}-attempted-connections`).textContent = s.AttemptedConnections
+        document.getElementById(`${s.ClientAddress}-accepted-connections`).textContent = s.AcceptedConnections
+        document.getElementById(`${s.ClientAddress}-active-connections`).textContent = s.ActiveConnections
+        document.getElementById(`${s.ClientAddress}-latest-connection`).textContent = formatSeconds(s.LatestConnection)
+      });
+    };
+    ws.onclose = () => {
+      console.log("ws closed");
+    };
+  </script>
+</body>
+
+</html>
