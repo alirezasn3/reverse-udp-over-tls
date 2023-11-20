@@ -148,12 +148,21 @@
                 datasets: [
                   {
                     label: 'Download (MB/s)',
-                    data: []
+                    data: [],
+                    tension: 0.1
                   }, {
                     label: 'Upload (MB/s)',
-                    data: []
+                    data: [],
+                    tension: 0.1
                   }
                 ]
+                , options: {
+                  elements: {
+                    point: {
+                      radius: 0
+                    }
+                  }
+                }
               }
             }
           );
@@ -165,6 +174,11 @@
         charts[s.ClientAddress].data.labels.push((new Date()).toTimeString().split(" ")[0]);
         charts[s.ClientAddress].data.datasets[0].data.push(s.CurrentDownload / 1024000)
         charts[s.ClientAddress].data.datasets[1].data.push(s.CurrentUpload / 1024000)
+        if (charts[s.ClientAddress].data.datasets[0] > 100) {
+          charts[s.ClientAddress].data.datasets[0].shift()
+          charts[s.ClientAddress].data.datasets[1].shift()
+          charts[s.ClientAddress].data.labels.shift()
+        }
         charts[s.ClientAddress].update();
         document.getElementById(`${s.ClientAddress}-status`).textContent = s.Status
         document.getElementById(`${s.ClientAddress}-total-download`).textContent = formatBytes(s.TotalDownload)
