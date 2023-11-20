@@ -72,11 +72,9 @@ func main() {
 		var wg sync.WaitGroup
 		for _, clientAddress := range GlobalConfig.TCPConnect {
 			wg.Add(1)
-			go func(a string) {
-				s := Server{ClientAddress: a}
-				servers = append(servers, &s)
-				s.Run()
-			}(clientAddress)
+			s := Server{ClientAddress: clientAddress}
+			servers = append(servers, &s)
+			go s.Run()
 		}
 		wg.Add(1)
 		go func() {
