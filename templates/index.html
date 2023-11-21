@@ -34,12 +34,12 @@
       </div>
     </div>
     <div class="flex flex-col w-full max-w-3xl mx-auto">
-      {{ range .servers }}
+      {{ range $i, $e := .servers }}
       <div
         class="client w-full my-4 p-4 bg-gray-900 rounded shadow-sm flex flex-col"
       >
         <div class="flex flex-col text-lg">
-          <div class="font-bold text-2xl mb-1">Client</div>
+          <div class="font-bold text-2xl mb-1">Client #{{ $i }}</div>
           <div class="flex">
             <div class="mr-1">Address :</div>
             <div>{{ .ClientAddress }}</div>
@@ -210,7 +210,7 @@
           charts[s.ClientAddress].data.datasets[1].data.push(
             s.CurrentUpload / 1024000
           );
-          if (charts[s.ClientAddress].data.datasets[0].data.length > 59) {
+          if (charts[s.ClientAddress].data.datasets[0].data.length > 60) {
             charts[s.ClientAddress].data.datasets[0].data.shift();
             charts[s.ClientAddress].data.datasets[1].data.shift();
             charts[s.ClientAddress].data.labels.shift();
