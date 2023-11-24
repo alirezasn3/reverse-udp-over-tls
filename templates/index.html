@@ -10,7 +10,7 @@
 
   <body class="bg-gray-800 text-gray-100 w-full min-h-[100svh] p-4">
     <div
-      class="flex flex-col p-4 rounded shadow-sm w-full max-w-3xl mx-auto bg-slate-900"
+      class="flex flex-col p-4 rounded shadow-sm w-full max-w-3xl mx-auto bg-slate-900 text-lg"
     >
       <div class="flex mb-1">
         <div class="w-1/2 flex">
@@ -209,7 +209,7 @@
           chart.datasets[1].data.push(s.CurrentUpload / 1024000);
           if (samples === 120) {
             chart.datasets[0].data = chart.datasets[0].data.slice(59);
-            chart.datasets[1].data = chart.datasets[0].data.slice(59);
+            chart.datasets[1].data = chart.datasets[1].data.slice(59);
             chart.labels = chart.labels.slice(59);
           }
           charts[s.ClientAddress].update();
