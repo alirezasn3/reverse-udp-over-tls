@@ -151,7 +151,6 @@
 
       let loaded = false;
       const charts = {};
-      let samples = 0;
       const totalDownloadEl = document.getElementById(`total-download`);
       const totalUploadEl = document.getElementById(`total-upload`);
       const currnetDownloadEl = document.getElementById(`current-download`);
@@ -162,8 +161,6 @@
         console.log("ws opend");
       };
       ws.onmessage = ({ data }) => {
-        samples++;
-
         const {
           servers,
           totalDownload,
@@ -207,7 +204,7 @@
           chart.labels.push(new Date().toTimeString().split(" ")[0]);
           chart.datasets[0].data.push(s.CurrentDownload / 1024000);
           chart.datasets[1].data.push(s.CurrentUpload / 1024000);
-          if (samples === 120) {
+          if (chart.labels.length == 120) {
             chart.datasets[0].data = chart.datasets[0].data.slice(59);
             chart.datasets[1].data = chart.datasets[1].data.slice(59);
             chart.labels = chart.labels.slice(59);
