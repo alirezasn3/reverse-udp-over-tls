@@ -151,12 +151,19 @@
 
       let loaded = false;
       const charts = {};
+      let samples = 0;
+      const totalDownloadEl = document.getElementById(`total-download`);
+      const totalUploadEl = document.getElementById(`total-upload`);
+      const currnetDownloadEl = document.getElementById(`current-download`);
+      const currentUploadEl = document.getElementById(`current-upload`);
 
       var ws = new WebSocket(`ws://${window.location.host}/ws`);
       ws.onopen = () => {
         console.log("ws opend");
       };
       ws.onmessage = ({ data }) => {
+        samples++;
+
         const {
           servers,
           totalDownload,
@@ -164,6 +171,7 @@
           currentDownload,
           currentUpload,
         } = JSON.parse(data);
+
         if (!loaded) {
           for (const s of servers) {
             const chart = new Chart(
@@ -176,13 +184,13 @@
                     {
                       label: "Download (MB/s)",
                       data: [],
-                      // tension: 0.3,
+                      tension: 0.2,
                       pointRadius: 0,
                     },
                     {
                       label: "Upload (MB/s)",
                       data: [],
-                      // tension: 0.3,
+                      tension: 0.2,
                       pointRadius: 0,
                     },
                   ],
@@ -193,22 +201,19 @@
           }
           loaded = true;
         }
+
         servers.forEach((s) => {
-          charts[s.ClientAddress].data.labels.push(
-            new Date().toTimeString().split(" ")[0]
-          );
-          charts[s.ClientAddress].data.datasets[0].data.push(
-            s.CurrentDownload / 1024000
-          );
-          charts[s.ClientAddress].data.datasets[1].data.push(
-            s.CurrentUpload / 1024000
-          );
-          if (charts[s.ClientAddress].data.datasets[0].data.length > 60) {
-            charts[s.ClientAddress].data.datasets[0].data.shift();
-            charts[s.ClientAddress].data.datasets[1].data.shift();
-            charts[s.ClientAddress].data.labels.shift();
+          const chart = charts[s.ClientAddress].data;
+          chart.labels.push(new Date().toTimeString().split(" ")[0]);
+          chart.datasets[0].data.push(s.CurrentDownload / 1024000);
+          chart.datasets[1].data.push(s.CurrentUpload / 1024000);
+          if (samples === 120) {
+            chart.datasets[0].data = chart.datasets[0].data.slice(59);
+            chart.datasets[1].data = chart.datasets[0].data.slice(59);
+            chart.labels = chart.labels.slice(59);
           }
           charts[s.ClientAddress].update();
+
           document.getElementById(`${s.ClientAddress}-status`).textContent =
             s.Status;
           document.getElementById(
@@ -236,14 +241,11 @@
             `${s.ClientAddress}-latest-connection`
           ).textContent = formatSeconds(s.LatestConnection);
         });
-        document.getElementById(`total-download`).textContent =
-          formatBytes(totalDownload);
-        document.getElementById(`total-upload`).textContent =
-          formatBytes(totalUpload);
-        document.getElementById(`current-download`).textContent =
-          formatBytes(currentDownload);
-        document.getElementById(`current-upload`).textContent =
-          formatBytes(currentUpload);
+
+        totalDownloadEl.textContent = formatBytes(totalDownload);
+        totalUploadEl.textContent = formatBytes(totalUpload);
+        currnetDownloadEl.textContent = formatBytes(currentDownload);
+        currentUploadEl.textContent = formatBytes(currentUpload);
       };
       ws.onclose = () => {
         console.log("ws closed");
