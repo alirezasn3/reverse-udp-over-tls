@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -21,30 +22,31 @@ var CurrentDownload uint64 = 0
 var CurrentUpload uint64 = 0
 
 type Config struct {
-	Role                string   `json:"role"`
-	TCPConnect          []string `json:"tcpConnect"`
-	UDPConnect          string   `json:"udpConnect"`
-	TCPListen           string   `json:"tcpListen"`
-	UDPListen           string   `json:"udpListen"`
-	MonitorAddress      string   `json:"monitorAddress"`
-	CertificateLocation string   `json:"certificateLocation"`
-	KeyLocation         string   `json:"keyLocation"`
-	TemplatesLocation   string   `json:"templatesLocation"`
-	TLSConfig           tls.Config
+	Role           string   `json:"role"`
+	TCPConnect     []string `json:"tcpConnect"`
+	UDPConnect     string   `json:"udpConnect"`
+	TCPListen      string   `json:"tcpListen"`
+	UDPListen      string   `json:"udpListen"`
+	MonitorAddress string   `json:"monitorAddress"`
+	TLSConfig      tls.Config
+}
+
+// find the current directory of the application
+func getCurrentDir() string {
+	wd, err := os.Getwd()
+	if err != nil {
+		panic(err)
+	}
+	return strings.ReplaceAll(wd, "\\", "/")
 }
 
 // initial setup
 func init() {
-	// create config file path
-	configPath := "config.json"
-
-	// add path prefix if provided
-	if len(os.Args) > 1 {
-		configPath = os.Args[1] + configPath
-	}
+	// get current dir
+	currentDir := getCurrentDir()
 
 	// read config file
-	bytes, err := os.ReadFile(configPath)
+	bytes, err := os.ReadFile(currentDir + "/config.json")
 	if err != nil {
 		panic(err)
 	}
@@ -56,7 +58,7 @@ func init() {
 	}
 
 	// load certificates
-	certificate, err := tls.LoadX509KeyPair(GlobalConfig.CertificateLocation, GlobalConfig.KeyLocation)
+	certificate, err := tls.LoadX509KeyPair(currentDir+"/"+GlobalConfig.Role+".crt", currentDir+"/"+GlobalConfig.Role+".key")
 	if err != nil {
 		panic(err)
 	}
@@ -98,18 +100,16 @@ func main() {
 		wg.Add(1)
 		go func() {
 			router := gin.Default()
-			router.LoadHTMLGlob(GlobalConfig.TemplatesLocation)
+			router.LoadHTMLGlob(getCurrentDir() + "/templates/*")
 			router.GET("/", func(c *gin.Context) {
 				c.HTML(http.StatusOK, "index.html", gin.H{
-					"servers":             servers,
-					"tcpConnect":          GlobalConfig.TCPConnect,
-					"udpConnect":          GlobalConfig.UDPConnect,
-					"certificateLocation": GlobalConfig.CertificateLocation,
-					"keyLocation":         GlobalConfig.KeyLocation,
-					"currentDownload":     CurrentDownload,
-					"currentUpload":       CurrentUpload,
-					"totalDownload":       totalDwonload,
-					"totalUpload":         totalUpload,
+					"servers":         servers,
+					"tcpConnect":      GlobalConfig.TCPConnect,
+					"udpConnect":      GlobalConfig.UDPConnect,
+					"currentDownload": CurrentDownload,
+					"currentUpload":   CurrentUpload,
+					"totalDownload":   totalDwonload,
+					"totalUpload":     totalUpload,
 				})
 			})
 			router.GET("/ws", func(ctx *gin.Context) {
