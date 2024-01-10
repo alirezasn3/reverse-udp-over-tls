@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"strings"
 	"sync"
 	"time"
 
@@ -22,31 +21,30 @@ var CurrentDownload uint64 = 0
 var CurrentUpload uint64 = 0
 
 type Config struct {
-	Role           string   `json:"role"`
-	TCPConnect     []string `json:"tcpConnect"`
-	UDPConnect     string   `json:"udpConnect"`
-	TCPListen      string   `json:"tcpListen"`
-	UDPListen      string   `json:"udpListen"`
-	MonitorAddress string   `json:"monitorAddress"`
-	TLSConfig      tls.Config
-}
-
-// find the current directory of the application
-func getCurrentDir() string {
-	wd, err := os.Getwd()
-	if err != nil {
-		panic(err)
-	}
-	return strings.ReplaceAll(wd, "\\", "/")
+	Role                string   `json:"role"`
+	TCPConnect          []string `json:"tcpConnect"`
+	UDPConnect          string   `json:"udpConnect"`
+	TCPListen           string   `json:"tcpListen"`
+	UDPListen           string   `json:"udpListen"`
+	MonitorAddress      string   `json:"monitorAddress"`
+	TemplatesLocation   string   `json:"templatesLocation"`
+	CertificateLocation string   `json:"certificateLocation"`
+	KeyLocation         string   `json:"keyLocation"`
+	TLSConfig           tls.Config
 }
 
 // initial setup
 func init() {
-	// get current dir
-	currentDir := getCurrentDir()
+	// create config file path
+	configPath := "config.json"
+
+	// add path prefix if provided
+	if len(os.Args) > 1 {
+		configPath = os.Args[1] + configPath
+	}
 
 	// read config file
-	bytes, err := os.ReadFile(currentDir + "/config.json")
+	bytes, err := os.ReadFile(configPath)
 	if err != nil {
 		panic(err)
 	}
@@ -58,7 +56,7 @@ func init() {
 	}
 
 	// load certificates
-	certificate, err := tls.LoadX509KeyPair(currentDir+"/certs/"+GlobalConfig.Role+".crt", currentDir+"/certs/"+GlobalConfig.Role+".key")
+	certificate, err := tls.LoadX509KeyPair(GlobalConfig.CertificateLocation, GlobalConfig.KeyLocation)
 	if err != nil {
 		panic(err)
 	}
@@ -100,7 +98,7 @@ func main() {
 		wg.Add(1)
 		go func() {
 			router := gin.Default()
-			router.LoadHTMLGlob(getCurrentDir() + "/templates/*")
+			router.LoadHTMLGlob(GlobalConfig.TemplatesLocation)
 			router.GET("/", func(c *gin.Context) {
 				c.HTML(http.StatusOK, "index.html", gin.H{
 					"servers":         servers,
