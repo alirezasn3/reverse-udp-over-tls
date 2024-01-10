@@ -58,7 +58,7 @@ func init() {
 	}
 
 	// load certificates
-	certificate, err := tls.LoadX509KeyPair(currentDir+"/"+GlobalConfig.Role+".crt", currentDir+"/"+GlobalConfig.Role+".key")
+	certificate, err := tls.LoadX509KeyPair(currentDir+"/certs/"+GlobalConfig.Role+".crt", currentDir+"/certs/"+GlobalConfig.Role+".key")
 	if err != nil {
 		panic(err)
 	}
