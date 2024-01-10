@@ -104,6 +104,7 @@ func main() {
 			router.GET("/", func(c *gin.Context) {
 				c.HTML(http.StatusOK, "index.html", gin.H{
 					"servers":         servers,
+					"serversCount":    len(servers),
 					"tcpConnect":      GlobalConfig.TCPConnect,
 					"udpConnect":      GlobalConfig.UDPConnect,
 					"currentDownload": CurrentDownload,
