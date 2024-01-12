@@ -241,8 +241,7 @@
       const currnetDownloadEl = document.getElementById("current-download");
       const currentUploadEl = document.getElementById("current-upload");
 
-      // var ws = new WebSocket("ws://" + window.location.host + "/ws");
-      var ws = new WebSocket("ws://" + "10.8.0.1:8080" + "/ws");
+      var ws = new WebSocket("ws://" + window.location.host + "/ws");
       ws.onopen = () => {
         console.log("ws opend");
       };
