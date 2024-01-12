@@ -20,195 +20,172 @@
   </head>
 
   <body
-    class="bg-slate-800 text-slate-100 w-full min-h-[100svh] p-4 font-sans overflow-y-scroll"
+    class="bg-slate-800 text-slate-100 w-full min-h-[100svh] overflow-y-scroll"
   >
     <nav
-      class="fixed left-0 top-0 w-16 h-full shadow bg-slate-900 text-white text-[10px] py-4 flex flex-col justify-center"
+      class="h-16 w-full shadow bg-slate-950 text-white flex justify-between items-center px-4"
     >
-      <a
-        class="flex flex-col items-center p-1 mx-1 rounded hover:bg-slate-950 hover:cursor-pointer"
-      >
-        <div>
-          <svg
-            class="fill-white mb-1"
-            xmlns="http://www.w3.org/2000/svg"
-            height="24"
-            viewBox="0 -960 960 960"
-            width="24"
-          >
-            <path
-              d="M120-160v-160h720v160H120Zm80-40h80v-80h-80v80Zm-80-440v-160h720v160H120Zm80-40h80v-80h-80v80Zm-80 280v-160h720v160H120Zm80-40h80v-80h-80v80Z"
-            />
-          </svg>
-        </div>
-        <div>SERVERS</div>
-      </a>
-      <a
-        class="flex flex-col items-center p-1 mx-1 rounded hover:bg-slate-950 hover:cursor-pointer my-4"
-      >
-        <div>
-          <svg
-            class="fill-white mb-1"
-            xmlns="http://www.w3.org/2000/svg"
-            height="24"
-            viewBox="0 -960 960 960"
-            width="24"
-          >
-            <path
-              d="m370-80-16-128q-13-5-24.5-12T307-235l-119 50L78-375l103-78q-1-7-1-13.5v-27q0-6.5 1-13.5L78-585l110-190 119 50q11-8 23-15t24-12l16-128h220l16 128q13 5 24.5 12t22.5 15l119-50 110 190-103 78q1 7 1 13.5v27q0 6.5-2 13.5l103 78-110 190-118-50q-11 8-23 15t-24 12L590-80H370Zm70-80h79l14-106q31-8 57.5-23.5T639-327l99 41 39-68-86-65q5-14 7-29.5t2-31.5q0-16-2-31.5t-7-29.5l86-65-39-68-99 42q-22-23-48.5-38.5T533-694l-13-106h-79l-14 106q-31 8-57.5 23.5T321-633l-99-41-39 68 86 64q-5 15-7 30t-2 32q0 16 2 31t7 30l-86 65 39 68 99-42q22 23 48.5 38.5T427-266l13 106Zm42-180q58 0 99-41t41-99q0-58-41-99t-99-41q-59 0-99.5 41T342-480q0 58 40.5 99t99.5 41Zm-2-140Z"
-            />
-          </svg>
-        </div>
-        <div>SETTINGS</div>
-      </a>
-      <a
-        class="flex flex-col items-center p-1 mx-1 rounded hover:bg-slate-950 hover:cursor-pointer"
-      >
-        <div>
-          <svg
-            class="fill-white mb-1"
-            xmlns="http://www.w3.org/2000/svg"
-            height="24"
-            viewBox="0 -960 960 960"
-            width="24"
-          >
-            <path
-              d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h440l200 200v440q0 33-23.5 56.5T760-120H200Zm0-80h560v-400H600v-160H200v560Zm80-80h400v-80H280v80Zm0-320h200v-80H280v80Zm0 160h400v-80H280v80Zm-80-320v160-160 560-560Z"
-            />
-          </svg>
-        </div>
-        <div>LOGS</div>
-      </a>
+      <div class="font-lg font-bold">UDP Over TLS Stats</div>
+      <div class="flex items-center text-xs">
+        <a
+          class="flex flex-col items-center p-1 mx-1 rounded hover:bg-slate-950 hover:cursor-pointer"
+        >
+          <div>
+            <svg
+              class="fill-white mb-1"
+              xmlns="http://www.w3.org/2000/svg"
+              height="24"
+              viewBox="0 -960 960 960"
+              width="24"
+            >
+              <path
+                d="M120-160v-160h720v160H120Zm80-40h80v-80h-80v80Zm-80-440v-160h720v160H120Zm80-40h80v-80h-80v80Zm-80 280v-160h720v160H120Zm80-40h80v-80h-80v80Z"
+              />
+            </svg>
+          </div>
+          <div>SERVERS</div>
+        </a>
+        <a
+          class="flex flex-col items-center p-1 mx-1 rounded hover:bg-slate-950 hover:cursor-pointer mx-2"
+        >
+          <div>
+            <svg
+              class="fill-white mb-1"
+              xmlns="http://www.w3.org/2000/svg"
+              height="24"
+              viewBox="0 -960 960 960"
+              width="24"
+            >
+              <path
+                d="m370-80-16-128q-13-5-24.5-12T307-235l-119 50L78-375l103-78q-1-7-1-13.5v-27q0-6.5 1-13.5L78-585l110-190 119 50q11-8 23-15t24-12l16-128h220l16 128q13 5 24.5 12t22.5 15l119-50 110 190-103 78q1 7 1 13.5v27q0 6.5-2 13.5l103 78-110 190-118-50q-11 8-23 15t-24 12L590-80H370Zm70-80h79l14-106q31-8 57.5-23.5T639-327l99 41 39-68-86-65q5-14 7-29.5t2-31.5q0-16-2-31.5t-7-29.5l86-65-39-68-99 42q-22-23-48.5-38.5T533-694l-13-106h-79l-14 106q-31 8-57.5 23.5T321-633l-99-41-39 68 86 64q-5 15-7 30t-2 32q0 16 2 31t7 30l-86 65 39 68 99-42q22 23 48.5 38.5T427-266l13 106Zm42-180q58 0 99-41t41-99q0-58-41-99t-99-41q-59 0-99.5 41T342-480q0 58 40.5 99t99.5 41Zm-2-140Z"
+              />
+            </svg>
+          </div>
+          <div>SETTINGS</div>
+        </a>
+        <a
+          class="flex flex-col items-center p-1 mx-1 rounded hover:bg-slate-950 hover:cursor-pointer"
+        >
+          <div>
+            <svg
+              class="fill-white mb-1"
+              xmlns="http://www.w3.org/2000/svg"
+              height="24"
+              viewBox="0 -960 960 960"
+              width="24"
+            >
+              <path
+                d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h440l200 200v440q0 33-23.5 56.5T760-120H200Zm0-80h560v-400H600v-160H200v560Zm80-80h400v-80H280v80Zm0-320h200v-80H280v80Zm0 160h400v-80H280v80Zm-80-320v160-160 560-560Z"
+              />
+            </svg>
+          </div>
+          <div>LOGS</div>
+        </a>
+      </div>
     </nav>
-    <div class="w-full pl-16">
+    <div class="w-full p-4">
       <div
-        class="flex flex-col p-4 rounded shadow-sm w-full max-w-3xl mx-auto bg-slate-900 mb-4"
+        class="grid grid-cols-2 place-items-center p-4 shadow-sm w-full bg-slate-900 mb-4 rounded"
       >
-        <div class="flex">
-          <div class="w-1/2 flex">
-            <div class="mr-1">Servers:</div>
-            <div class="font-bold">{{ .serversCount }}</div>
+        <div class="flex items-center">
+          <div class="mr-1 text-lg">↓</div>
+          <div id="total-download" class="font-bold">{{ .TotalDownload }}</div>
+          <div class="w-2 h-2 mx-2 rounded-full bg-slate-500"></div>
+          <div id="current-download" class="font-bold">
+            {{ .CurrentDownload }}
           </div>
-          <!-- <div class="w-1/2 flex">
-            <div class="mr-1">Uptime:</div>
-            <div class="font-bold" id="started-at"></div>
-          </div> -->
+          <div>/s</div>
         </div>
-        <div class="flex my-1">
-          <div class="w-1/2 flex">
-            <div class="mr-1">↓ Total Download:</div>
-            <div id="total-download" class="font-bold">
-              {{ .TotalDownload }}
-            </div>
-          </div>
-          <div class="w-1/2 flex">
-            <div class="mr-1">↓ Current Download:</div>
-            <div id="current-download" class="font-bold">
-              {{ .CurrentDownload }}
-            </div>
-          </div>
-        </div>
-        <div class="flex">
-          <div class="w-1/2 flex">
-            <div class="mr-1">↑ Total Upload:</div>
-            <div id="total-upload" class="font-bold">{{ .TotalUpload }}</div>
-          </div>
-          <div class="w-1/2 flex">
-            <div class="mr-1">↑ Current Upload:</div>
-            <div id="current-upload" class="font-bold">
-              {{ .CurrentUpload }}
-            </div>
-          </div>
+        <div class="flex items-center">
+          <div class="mr-1 text-lg">↑</div>
+          <div id="total-upload" class="font-bold">{{ .TotalUpload }}</div>
+          <div class="w-2 h-2 mx-2 rounded-full bg-slate-500"></div>
+          <div id="current-upload" class="font-bold">{{ .CurrentUpload }}</div>
+          <div>/s</div>
         </div>
       </div>
-      <div class="flex flex-col w-full max-w-3xl mx-auto">
+      <div class="w-full grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
         {{ range $i, $e := .servers }}
         <div
-          class="client transition-all duration-500 relative w-full my-1 p-4 bg-slate-900 rounded shadow-sm flex flex-col max-h-20 overflow-hidden"
+          class="client text-sm transition-all duration-500 relative w-full my-1 p-4 bg-slate-900 rounded shadow-sm flex flex-col max-h-[60px] overflow-hidden"
         >
           <button
-            class="expand-button transition-all duration-500 absolute top-7 right-7 w-4 h-4 border-r-4 border-b-4 rotate-45"
+            class="expand-button transition-all duration-500 absolute top-5 right-5 w-4 h-4 border-r-4 border-b-4 rotate-45"
           ></button>
-          <div class="flex flex-col text-lg">
-            <div class="flex">
-              <div class="mr-1">Address :</div>
-              <div class="font-bold">{{ .ClientAddress }}</div>
+          <div class="flex items-center font-bold text-lg">
+            <div class="text-yellow-500">{{ .ClientAddress }}</div>
+            <div class="w-1.5 h-1.5 mx-1.5 bg-slate-500 rounded-full"></div>
+            <div
+              class="status text-red-500 uppercase"
+              id="{{ .ClientAddress }}-status"
+            >
+              {{ .Status }}
             </div>
+          </div>
+          <div class="w-full bg-slate-800 h-0.5 my-2"></div>
+          <div class="flex flex-col">
             <div class="flex">
-              <div class="mr-1">Status :</div>
               <div
-                class="status font-bold text-red-500"
-                id="{{ .ClientAddress }}-status"
+                class="font-bold text-blue-500"
+                id="{{ .ClientAddress }}-accepted-connections"
               >
-                {{ .Status }}
+                {{ .AcceptedConnections }}
               </div>
+              <div>/</div>
+              <div
+                class="font-bold"
+                id="{{ .ClientAddress }}-attempted-connections"
+              >
+                {{ .AttemptedConnections }}
+              </div>
+              <div class="ml-1">Connections Accepted</div>
             </div>
-          </div>
-          <div class="w-full mx-1 bg-slate-800 h-0.5 my-2"></div>
-          <div class="flex flex-col text-lg">
-            <div class="font-bold text-2xl mb-1">Connections</div>
-            <div class="flex">
-              <div class="w-1/2 flex">
-                <div class="mr-1">Attempted Connections :</div>
-                <div id="{{ .ClientAddress }}-attempted-connections">
-                  {{ .AttemptedConnections }}
-                </div>
+            <div class="flex my-1">
+              <div
+                class="font-bold text-blue-500"
+                id="{{ .ClientAddress }}-active-connections"
+              >
+                {{ .ActiveConnections }}
               </div>
-              <div class="w-1/2 flex">
-                <div class="mr-1">Accepted Connections :</div>
-                <div id="{{ .ClientAddress }}-accepted-connections">
-                  {{ .AcceptedConnections }}
-                </div>
-              </div>
-            </div>
-            <div class="flex">
-              <div class="w-1/2 flex">
-                <div class="mr-1">Active Connections :</div>
-                <div id="{{ .ClientAddress }}-active-connections">
-                  {{ .ActiveConnections }}
-                </div>
-              </div>
-              <div class="w-1/2 flex">
-                <div class="mr-1">Lastest Connection :</div>
-                <div id="{{ .ClientAddress }}-latest-connection">
-                  {{ .LatestConnection }}
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="w-full mx-1 bg-slate-800 h-0.5 my-2"></div>
-          <div class="flex flex-col text-lg w-full">
-            <div class="font-bold text-2xl mb-1">Bandwidth</div>
-            <div class="w-full flex">
-              <div class="w-1/2 flex">
-                <div class="mr-1">Total Download :</div>
-                <div id="{{ .ClientAddress }}-total-download">
-                  {{ .TotalDownload }}
-                </div>
-              </div>
-              <div class="w-1/2 flex">
-                <div class="mr-1">Current Download :</div>
-                <div id="{{ .ClientAddress }}-current-download">
-                  {{ .CurrentDownload }}
-                </div>
-              </div>
+              <div class="ml-1">Active Connections</div>
             </div>
             <div class="flex">
-              <div class="w-1/2 flex">
-                <div class="mr-1">Total Upload :</div>
-                <div id="{{ .ClientAddress }}-total-upload">
-                  {{ .TotalUpload }}
-                </div>
+              <div class="mr-1">Lastest connection was</div>
+              <div
+                class="font-bold text-blue-500"
+                id="{{ .ClientAddress }}-latest-connection"
+              >
+                {{ .LatestConnection }}
               </div>
-              <div class="w-1/2 flex">
-                <div class="mr-1">Current Upload :</div>
-                <div id="{{ .ClientAddress }}-current-upload">
-                  {{ .CurrentUpload }}
-                </div>
-              </div>
+              <div class="ml-1">ago</div>
             </div>
           </div>
-          <div class="w-full bg-slate-950 rounded mt-2">
+          <div class="w-full bg-slate-800 h-0.5 my-2"></div>
+          <div class="flex flex-col w-full">
+            <div class="w-full flex items-center">
+              <div class="mr-1 w-24">Download :</div>
+              <div id="{{ .ClientAddress }}-total-download">
+                {{ .TotalDownload }}
+              </div>
+              <div class="w-1 h-1 mx-2 bg-slate-500 rounded-full"></div>
+              <div id="{{ .ClientAddress }}-current-download">
+                {{ .CurrentDownload }}
+              </div>
+              <div>/S</div>
+            </div>
+            <div class="flex items-center">
+              <div class="mr-1 w-24">Upload :</div>
+              <div id="{{ .ClientAddress }}-total-upload">
+                {{ .TotalUpload }}
+              </div>
+              <div class="w-1 h-1 mx-2 bg-slate-500 rounded-full"></div>
+              <div id="{{ .ClientAddress }}-current-upload">
+                {{ .CurrentUpload }}
+              </div>
+              <div>/S</div>
+            </div>
+          </div>
+          <div class="w-full bg-slate-950 rounded mt-2 min-h-96">
             <canvas id="{{ .ClientAddress }}-chart"></canvas>
           </div>
         </div>
@@ -216,7 +193,7 @@
       </div>
     </div>
     <script defer>
-      function formatSeconds(totalSeconds, noPrefix = false) {
+      function formatSeconds(totalSeconds, noPrefix = true) {
         if (!totalSeconds) return "unknown";
         totalSeconds = Math.trunc(totalSeconds - Date.now() / 1000);
         const prefix = totalSeconds < 0 && !noPrefix ? "-" : "";
@@ -225,7 +202,7 @@
         const totalMinutes = Math.trunc(totalSeconds / 60);
         if (totalMinutes / 60 < 1) return prefix + totalMinutes + " minutes";
         const totalHours = Math.trunc(totalMinutes / 60);
-        if (totalHours / 24 < 1) return prefix + totalHours + "hours";
+        if (totalHours / 24 < 1) return prefix + totalHours + " hours";
         return prefix + Math.trunc(totalHours / 24) + " days";
       }
 
@@ -247,11 +224,11 @@
       document.querySelectorAll(".expand-button").forEach((el) =>
         el.addEventListener("click", ({ target }) => {
           const parent = target.parentElement;
-          if (parent.classList.contains("max-h-20")) {
+          if (parent.classList.contains("max-h-[60px]")) {
             target.classList.replace("rotate-45", "rotate-[225deg]");
-            parent.classList.replace("max-h-20", "max-h-[2000px]");
+            parent.classList.replace("max-h-[60px]", "max-h-[2000px]");
           } else {
-            parent.classList.replace("max-h-[2000px]", "max-h-20");
+            parent.classList.replace("max-h-[2000px]", "max-h-[60px]");
             target.classList.replace("rotate-[225deg]", "rotate-45");
           }
         })
@@ -284,6 +261,36 @@
               document.getElementById(s.ClientAddress + "-chart"),
               {
                 type: "line",
+                options: {
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  plugins: {
+                    legend: {
+                      labels: {
+                        // This more specific font property overrides the global property
+                        font: {
+                          size: 10,
+                        },
+                      },
+                    },
+                  },
+                  scales: {
+                    x: {
+                      ticks: {
+                        font: {
+                          size: 8,
+                        },
+                      },
+                    },
+                    y: {
+                      ticks: {
+                        font: {
+                          size: 8,
+                        },
+                      },
+                    },
+                  },
+                },
                 data: {
                   labels: [],
                   datasets: [
