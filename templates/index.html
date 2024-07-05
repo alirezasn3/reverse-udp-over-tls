@@ -32,14 +32,14 @@
         class="p-4 shadow-sm w-full bg-slate-900 mb-4 rounded max-md:text-sm"
       >
         <div class="flex items-center">
-          <div class="w-6">Download:</div>
+          <div class="w-20">Download:</div>
           <div id="total-download">{{ .TotalDownload }}</div>
           <div class="mx-1">|</div>
           <div id="current-download">{{ .CurrentDownload }}</div>
           <div>/s</div>
         </div>
         <div class="flex items-center">
-          <div class="w-6">Upload:</div>
+          <div class="w-20">Upload:</div>
           <div id="total-upload">{{ .TotalUpload }}</div>
           <div class="mx-1">|</div>
           <div id="current-upload">{{ .CurrentUpload }}</div>
@@ -54,7 +54,7 @@
           <button
             class="expand-button transition-all duration-500 absolute top-5 right-5 w-4 h-4 border-r-4 border-b-4 rotate-45"
           ></button>
-          <div class="flex items-center font-bold">
+          <div class="flex items-center font-bold text-lg">
             <div class="text-yellow-500">{{ .ClientAddress }}</div>
             <div class="w-1.5 h-1.5 mx-1.5 bg-slate-500 rounded-full"></div>
             <div
