@@ -15,7 +15,18 @@ source ~/.profile
 
 go build
 
-cp reverse-udp-over-tls.service /etc/systemd/system/reverse-udp-over-tls.service
+echo "[Unit]
+Description=reverse UDP over TLS tunnel
+After=syslog.target network-online.target
+Wants=network-online.target
+[Service]
+Type=simple
+PIDFile=/run/reverse-udp-over-tls.pid
+ExecStart=/root/reverse-udp-over-tls/reverse-udp-over-tls /root/reverse-udp-over-tls/
+Restart=on-failure
+RestartSec=1s
+[Install]
+WantedBy=multi-user.target" >> /etc/systemd/system/reverse-udp-over-tls.service
 chmod 664 /etc/systemd/system/reverse-udp-over-tls.service
 systemctl daemon-reload
 systemctl enable reverse-udp-over-tls
