@@ -5,7 +5,7 @@ net.ipv4.tcp_congestion_control=bbr
 net.ipv4.ip_forward=1" >> /etc/sysctl.conf
 sysctl -p
 
-openssl req -new -nodes -x509 -out ../cert -keyout ../key -days 3650 -subj "/C=DE/ST=NRW/L=Earth/O=Example Company/OU=IT/CN=www.example.com/emailAddress=john@example.com"
+openssl req -new -nodes -x509 -out cert -keyout key -days 3650 -subj "/C=DE/ST=NRW/L=Earth/O=Example Company/OU=IT/CN=www.example.com/emailAddress=john@example.com"
 
 curl -OL https://golang.org/dl/go1.22.5.linux-amd64.tar.gz
 sudo tar -C /usr/local -xvf go1.22.5.linux-amd64.tar.gz
