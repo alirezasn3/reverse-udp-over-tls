@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -19,32 +20,28 @@ var totalDwonload uint64 = 0
 var totalUpload uint64 = 0
 var CurrentDownload uint64 = 0
 var CurrentUpload uint64 = 0
+var path string
 
 type Config struct {
-	Role                string   `json:"role"`
-	TCPConnect          []string `json:"tcpConnect"`
-	UDPConnect          string   `json:"udpConnect"`
-	TCPListen           string   `json:"tcpListen"`
-	UDPListen           string   `json:"udpListen"`
-	MonitorAddress      string   `json:"monitorAddress"`
-	TemplatesLocation   string   `json:"templatesLocation"`
-	CertificateLocation string   `json:"certificateLocation"`
-	KeyLocation         string   `json:"keyLocation"`
-	TLSConfig           tls.Config
+	Role           string   `json:"role"`
+	TCPConnect     []string `json:"tcpConnect"`
+	UDPConnect     string   `json:"udpConnect"`
+	TCPListen      string   `json:"tcpListen"`
+	UDPListen      string   `json:"udpListen"`
+	MonitorAddress string   `json:"monitorAddress"`
+	TLSConfig      tls.Config
 }
 
 // initial setup
 func init() {
-	// create config file path
-	configPath := "config.json"
-
-	// add path prefix if provided
-	if len(os.Args) > 1 {
-		configPath = os.Args[1] + configPath
+	execPath, err := os.Executable()
+	if err != nil {
+		panic(err)
 	}
+	path = filepath.Dir(execPath)
 
 	// read config file
-	bytes, err := os.ReadFile(configPath)
+	bytes, err := os.ReadFile(filepath.Join(path, "config.json"))
 	if err != nil {
 		panic(err)
 	}
@@ -56,7 +53,7 @@ func init() {
 	}
 
 	// load certificates
-	certificate, err := tls.LoadX509KeyPair(GlobalConfig.CertificateLocation, GlobalConfig.KeyLocation)
+	certificate, err := tls.LoadX509KeyPair(filepath.Join(path, "cert"), filepath.Join(path, "key"))
 	if err != nil {
 		panic(err)
 	}
@@ -98,7 +95,7 @@ func main() {
 		wg.Add(1)
 		go func() {
 			router := gin.Default()
-			router.LoadHTMLGlob(GlobalConfig.TemplatesLocation)
+			router.LoadHTMLGlob(filepath.Join(path, "templates/*"))
 			router.GET("/", func(c *gin.Context) {
 				c.HTML(http.StatusOK, "index.html", gin.H{
 					"servers":         servers,
