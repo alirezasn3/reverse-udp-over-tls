@@ -114,6 +114,7 @@ func main() {
 				if err != nil {
 					http.Error(ctx.Writer, "Could not open websocket connection", http.StatusBadRequest)
 					fmt.Println(err)
+					return
 				}
 				for {
 					time.Sleep(time.Second)
