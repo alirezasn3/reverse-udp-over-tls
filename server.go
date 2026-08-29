@@ -2,147 +2,194 @@ package main
 
 import (
 	"crypto/tls"
-	"errors"
 	"fmt"
-	"io"
+	"log"
 	"net"
-	"syscall"
+	"sync"
+	"sync/atomic"
 	"time"
 )
 
 type Server struct {
-	ClientAddress        string
-	TotalDownload        uint64
-	TotalUpload          uint64
-	AttemptedConnections uint64
-	AcceptedConnections  uint64
-	ActiveConnections    uint64
-	CurrentDownload      uint64
-	CurrentUpload        uint64
-	LatestConnection     int64
-	Status               string
-	D                    uint64 // to help calculate current donwload
-	U                    uint64 // to help calculate current upload
+	HasActiveConnectionToClient atomic.Bool
 }
 
 func (s *Server) Run() {
-	s.Status = "down"
-	lastLog := time.Now()
-	for {
+	s.HasActiveConnectionToClient.Store(false)
+
+	for range time.NewTicker(time.Second).C {
+		if s.HasActiveConnectionToClient.Load() {
+			continue
+		}
+
 		connectionToClient, e := s.CreateConnection()
 		if e != nil {
-			if e != io.EOF && !errors.Is(e, syscall.ECONNRESET) && time.Since(lastLog).Milliseconds() > 1000 {
-				fmt.Printf("[%s] failed to create new connection to %s\n", e.Error(), s.ClientAddress)
-				if s.Status == "up" {
-					s.Status = "down"
-				}
-			} else {
-				if s.Status == "down" {
-					s.Status = "up"
-				}
-			}
+			log.Printf("[%s] failed to create new tcp connection from %s to %s\n", e.Error(), connectionToClient.LocalAddr().String(), GlobalConfig.TCPConnect)
 		} else {
-			fmt.Printf("created new connection to client to %s\n", s.ClientAddress)
+			log.Printf("created new tcp connection from %s to client at %s\n", connectionToClient.LocalAddr().String(), GlobalConfig.TCPConnect)
 
-			s.LatestConnection = time.Now().Unix()
+			s.HasActiveConnectionToClient.Store(true)
 
 			// handle connection to client on new go routine
 			go s.HandleConnection(connectionToClient)
-
-			if s.Status == "down" {
-				s.Status = "up"
-			}
 		}
-		time.Sleep(time.Millisecond * 200)
 	}
 }
 
 func (s *Server) CreateConnection() (*tls.Conn, error) {
-	s.AttemptedConnections++
 	// connect to client
-	c, e := tls.DialWithDialer(&net.Dialer{Timeout: time.Second * 1}, "tcp", s.ClientAddress, &GlobalConfig.TLSConfig)
+	c, e := tls.DialWithDialer(
+		&net.Dialer{Timeout: time.Second * 1, KeepAliveConfig: net.KeepAliveConfig{Idle: time.Second * 10, Interval: time.Second * 10, Count: 1}},
+		"tcp",
+		GlobalConfig.TCPConnect,
+		&tls.Config{
+			InsecureSkipVerify: true,
+			VerifyConnection: func(cs tls.ConnectionState) error {
+				certs := cs.PeerCertificates
+				if len(certs) == 0 {
+					return fmt.Errorf("no certificates provided by client")
+				}
+				// Extract the Organization field injected on the client
+				orgs := certs[0].Subject.Organization
+				if len(orgs) == 0 || orgs[0] != GlobalConfig.Secret {
+					return fmt.Errorf("unauthorized: invalid proxy secret token")
+				}
+				return nil // Validation passed
+			},
+		},
+	)
 	if e != nil {
 		return nil, e
 	}
-	s.AcceptedConnections++
-	s.ActiveConnections++
 	return c, nil
 }
 
 func (s *Server) HandleConnection(connectionToClient *tls.Conn) {
-	// close connection to client when done
 	defer func() {
-		s.ActiveConnections--
-		connectionToClient.Close()
+		s.HasActiveConnectionToClient.Store(false)
 	}()
+
+	// close connection to client when done
+	defer connectionToClient.Close()
 
 	// parse local service address
 	localServiceAddress, err := net.ResolveUDPAddr("udp4", GlobalConfig.UDPConnect)
 	if err != nil {
-		fmt.Printf("failed to parse local service address %s\n%s\n", GlobalConfig.UDPConnect, err.Error())
+		log.Printf("failed to parse local service address %s\n%s\n", GlobalConfig.UDPConnect, err.Error())
 		return
 	}
 
-	// create connection serivce
+	// create connection to serivce
 	connectionToLocalService, err := net.DialUDP("udp4", nil, localServiceAddress)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		return
 	}
 	defer connectionToLocalService.Close()
 
 	// timeout
-	d := time.Hour
+	d := time.Minute
+
+	var shouldClose atomic.Bool
+	shouldClose.Store(false)
+
+	var wg sync.WaitGroup
 
 	// handle incoming packets from client
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
+
 		b := make([]byte, 1500)
 		var n int
 		var e error
 		for {
+			if shouldClose.Load() {
+				return
+			}
+
 			// set read deadline
 			e = connectionToClient.SetReadDeadline(time.Now().Add(d))
 			if e != nil {
+				if !shouldClose.Load() {
+					shouldClose.Store(true)
+					log.Println("failed to set read deadline for tcp connection to client")
+				}
+				connectionToLocalService.Close()
 				return
 			}
 
 			// read packet from client
 			n, e = connectionToClient.Read(b)
 			if e != nil {
+				if !shouldClose.Load() {
+					shouldClose.Store(true)
+					log.Println("failed to read from tcp connection to client")
+				}
+				connectionToLocalService.Close()
 				return
 			}
-			s.TotalUpload += uint64(n)
 
 			// write packet to local service
 			_, e = connectionToLocalService.Write(b[:n])
 			if e != nil {
+				if !shouldClose.Load() {
+					shouldClose.Store(true)
+					log.Println("failed to write packet to local udp service")
+				}
+				connectionToClient.Close()
 				return
 			}
 		}
 	}()
 
 	// handle incoming packets from local service
-	b := make([]byte, 1500)
-	var n int
-	var e error
-	for {
-		// set read deadline
-		e = connectionToLocalService.SetReadDeadline(time.Now().Add(d))
-		if e != nil {
-			return
-		}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
 
-		// read packet from local service
-		n, e = connectionToLocalService.Read(b)
-		if e != nil {
-			return
-		}
-		s.TotalDownload += uint64(n)
+		b := make([]byte, 1500)
+		var n int
+		var e error
+		for {
+			if shouldClose.Load() {
+				return
+			}
 
-		// write packet to client
-		_, e = connectionToClient.Write(b[:n])
-		if e != nil {
-			return
+			// set read deadline
+			e = connectionToLocalService.SetReadDeadline(time.Now().Add(d))
+			if e != nil {
+				if !shouldClose.Load() {
+					shouldClose.Store(true)
+					log.Println("failed to set read deadline for udp connection to local service")
+				}
+				connectionToClient.Close()
+				return
+			}
+
+			// read packet from local service
+			n, e = connectionToLocalService.Read(b)
+			if e != nil {
+				if !shouldClose.Load() {
+					shouldClose.Store(true)
+					log.Println("failed to read packet from local udp service")
+				}
+				connectionToClient.Close()
+				return
+			}
+
+			// write packet to client
+			_, e = connectionToClient.Write(b[:n])
+			if e != nil {
+				if !shouldClose.Load() {
+					shouldClose.Store(true)
+					log.Println("failed to write packet to tcp connection to client")
+				}
+				connectionToLocalService.Close()
+				return
+			}
 		}
-	}
+	}()
+
+	wg.Wait()
 }

@@ -1,11 +1,46 @@
 package main
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"crypto/tls"
-	"fmt"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"log"
+	"math/big"
 	"net"
 	"net/netip"
+	"sync"
+	"sync/atomic"
+	"time"
 )
+
+func generateMemoryCert() (tls.Certificate, error) {
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		return tls.Certificate{}, err
+	}
+
+	template := x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "ephemeral-server", Organization: []string{GlobalConfig.Secret}},
+		NotBefore:    time.Now().Add(-1 * time.Minute),
+		NotAfter:     time.Now().Add(7 * 24 * time.Hour),
+		KeyUsage:     x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+	}
+
+	certDER, err := x509.CreateCertificate(rand.Reader, &template, &template, &priv.PublicKey, priv)
+	if err != nil {
+		return tls.Certificate{}, err
+	}
+
+	return tls.Certificate{
+		Certificate: [][]byte{certDER},
+		PrivateKey:  priv,
+	}, nil
+}
 
 func addrPortToString(a netip.AddrPort) string {
 	ip := a.Addr().As4()
@@ -18,118 +53,180 @@ func addrPortToString(a netip.AddrPort) string {
 }
 
 type Client struct {
-	ConnectionPool               chan net.Conn
-	UserAddressToConnectionTable map[string]net.Conn
-	CleaningUpMasterConnection   bool
-	WaitingForConnection         bool
+	HasActiveConnectionToServer atomic.Bool
 }
 
 func (c *Client) Run() {
-	c.WaitingForConnection = false
+	c.HasActiveConnectionToServer.Store(false)
 
-	// initialize connection pool
-	c.ConnectionPool = make(chan net.Conn, 1024)
-
-	// initialize connections table
-	c.UserAddressToConnectionTable = make(map[string]net.Conn)
-
-	// listen for new connections from server
-	go func() {
-		listener, err := tls.Listen("tcp", GlobalConfig.TCPListen, &GlobalConfig.TLSConfig)
-		if err != nil {
-			panic(err)
-		}
-
-		// accept new connections from server
-		for {
-			connectionToServer, e := listener.Accept()
-			if e != nil {
-				fmt.Printf("[%s] failed to accept new connection\n", e.Error())
-				continue
-			}
-			if c.WaitingForConnection {
-				// add stablished connection to the pool
-				c.ConnectionPool <- connectionToServer
-			} else {
-				// close connection
-				connectionToServer.Close()
-			}
-		}
-	}()
-
-	// create local listener
+	// parse local udp listener address
 	listenAddress, err := net.ResolveUDPAddr("udp4", GlobalConfig.UDPListen)
 	if err != nil {
 		panic(err)
 	}
-	localListener, err := net.ListenUDP("udp4", listenAddress)
-	if err != nil {
-		panic(err)
-	}
-	defer localListener.Close()
-	fmt.Println("listening on " + GlobalConfig.UDPListen)
 
-	// handle packets from users
-	b := make([]byte, 1500)
+	// generate ssl certificate
+	cert, err := generateMemoryCert()
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	// create tcp listener to listen for connections from the server
+	listener, err := tls.Listen("tcp", GlobalConfig.TCPListen, &tls.Config{Certificates: []tls.Certificate{cert}})
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	log.Printf("listening on %s for tcp connections from the server...\n", GlobalConfig.TCPListen)
+
+	// accept new tcp connection from server
 	for {
-		// read packet from user
-		n, userAddress, e := localListener.ReadFromUDPAddrPort(b)
+		connectionToServer, e := listener.Accept()
 		if e != nil {
-			if conn, ok := c.UserAddressToConnectionTable[addrPortToString(userAddress)]; ok {
-				conn.Close()
-				delete(c.UserAddressToConnectionTable, addrPortToString(userAddress))
-			}
+			log.Printf("[%s] failed to accept new connection\n", e.Error())
 			continue
 		}
-
-		// check if user has connection to server
-		if conn, ok := c.UserAddressToConnectionTable[addrPortToString(userAddress)]; ok {
-			_, e = conn.Write(b[:n])
-			if e != nil {
-				conn.Close()
-				delete(c.UserAddressToConnectionTable, addrPortToString(userAddress))
-			}
+		if c.HasActiveConnectionToServer.Load() {
+			// close connection
+			connectionToServer.Close()
+			log.Println("closed new tcp connection from server, already have active connection")
 		} else {
-			c.WaitingForConnection = true
+			localListener, err := net.ListenUDP("udp4", listenAddress)
+			if err != nil {
+				panic(err)
+			}
+			log.Printf("listening on %s for udp packets from local service\n", GlobalConfig.UDPListen)
 
-			// wait for new connection from server
-			connectionToServer := <-c.ConnectionPool
+			c.HasActiveConnectionToServer.Store(true)
 
-			c.WaitingForConnection = false
+			var shouldClose atomic.Bool
+			shouldClose.Store(false)
 
-			// add new connection to table
-			c.UserAddressToConnectionTable[addrPortToString(userAddress)] = connectionToServer
+			var wg sync.WaitGroup
 
-			// handle new packets from server on new go routine
-			go func(userAddr netip.AddrPort, conn net.Conn, firstPacket []byte) {
-				fmt.Printf("accepted new connection from %s for %s\n", conn.RemoteAddr(), userAddr)
+			d := time.Minute
 
-				// write the first packet to server
-				_, e = connectionToServer.Write(firstPacket)
-				if e != nil {
-					connectionToServer.Close()
-					delete(c.UserAddressToConnectionTable, addrPortToString(userAddress))
-				}
+			var a atomic.Pointer[net.UDPAddr]
 
-				// close connection when done
-				defer delete(c.UserAddressToConnectionTable, addrPortToString(userAddress))
-				defer conn.Close()
+			// handle incoming tcp packets from the server
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
 
-				// read packts from server
 				b := make([]byte, 1500)
 				var n int
 				var e error
+				var ta *net.UDPAddr
+
 				for {
-					n, e = conn.Read(b)
-					if e != nil {
+					if shouldClose.Load() {
 						return
 					}
-					_, e = localListener.WriteToUDPAddrPort(b[:n], userAddr)
+
+					// set read deadline
+					e = connectionToServer.SetReadDeadline(time.Now().Add(d))
 					if e != nil {
+						if !shouldClose.Load() {
+							shouldClose.Store(true)
+							log.Println("failed to set read deadline for tcp connection to server")
+						}
+						localListener.Close()
+						return
+					}
+
+					// read packet from server
+					n, e = connectionToServer.Read(b)
+					if e != nil {
+						if !shouldClose.Load() {
+							shouldClose.Store(true)
+							log.Println("failed to read from tcp connection to server")
+						}
+						localListener.Close()
+						return
+					}
+
+					// write packet to local service
+					ta = a.Load()
+					if ta == nil {
+						continue
+					}
+					_, e = localListener.WriteToUDP(b[:n], a.Load())
+					if e != nil {
+						if !shouldClose.Load() {
+							shouldClose.Store(true)
+							log.Println("failed to write packet to local udp service")
+						}
+						connectionToServer.Close()
+						return
+					}
+
+				}
+			}()
+
+			// handle incoming udp packets from local service
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+
+				b := make([]byte, 1500)
+				var n int
+				var e error
+				var ta, ta2 *net.UDPAddr
+
+				for {
+					if shouldClose.Load() {
+						return
+					}
+
+					// set read deadline
+					e = localListener.SetReadDeadline(time.Now().Add(d))
+					if e != nil {
+						if !shouldClose.Load() {
+							shouldClose.Store(true)
+							log.Println("failed to set read deadline for udp connection to local service")
+						}
+						connectionToServer.Close()
+						return
+					}
+
+					// read udp packet from local client
+					n, ta, e = localListener.ReadFromUDP(b)
+					if e != nil {
+						if !shouldClose.Load() {
+							shouldClose.Store(true)
+							log.Println("failed to read packet from local udp service")
+						}
+						connectionToServer.Close()
+						return
+					}
+
+					// update udp clinet address
+					if ta != nil {
+						ta2 = a.Load()
+						if ta2 == nil || ta2.Port != ta.Port || !ta2.IP.Equal(ta.IP) {
+							a.Store(ta)
+						}
+					}
+
+					// write packet to server
+					_, e = connectionToServer.Write(b[:n])
+					if e != nil {
+						if !shouldClose.Load() {
+							shouldClose.Store(true)
+							log.Println("failed to write packet to tcp connection to server")
+						}
+						localListener.Close()
 						return
 					}
 				}
-			}(userAddress, connectionToServer, b[:n])
+			}()
+
+			wg.Wait()
+
+			c.HasActiveConnectionToServer.Store(false)
+
+			localListener.Close()
 		}
 	}
 }
