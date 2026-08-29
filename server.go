@@ -47,12 +47,14 @@ func (s *Server) CreateConnection() (*tls.Conn, error) {
 			VerifyConnection: func(cs tls.ConnectionState) error {
 				certs := cs.PeerCertificates
 				if len(certs) == 0 {
+					log.Println("verification failed: no certificates provided by client")
 					return fmt.Errorf("no certificates provided by client")
 				}
 				// Extract the Organization field injected on the client
 				orgs := certs[0].Subject.Organization
 				if len(orgs) == 0 || orgs[0] != GlobalConfig.Secret {
-					return fmt.Errorf("unauthorized: invalid proxy secret token")
+					log.Println("verification failed: unauthorized: invalid secret")
+					return fmt.Errorf("unauthorized: invalid secret")
 				}
 				return nil // Validation passed
 			},
@@ -86,6 +88,7 @@ func (s *Server) HandleConnection(connectionToClient *tls.Conn) {
 		return
 	}
 	defer connectionToLocalService.Close()
+	log.Printf("created new udp connection to local service at %s\n", GlobalConfig.UDPConnect)
 
 	// timeout
 	d := time.Minute

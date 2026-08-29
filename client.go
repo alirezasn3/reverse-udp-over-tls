@@ -92,6 +92,7 @@ func (c *Client) Run() {
 			connectionToServer.Close()
 			log.Println("closed new tcp connection from server, already have active connection")
 		} else {
+			log.Printf("accepted new tcp connection from server at %s\n", connectionToServer.RemoteAddr().String())
 			localListener, err := net.ListenUDP("udp4", listenAddress)
 			if err != nil {
 				panic(err)
