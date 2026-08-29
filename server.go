@@ -24,7 +24,7 @@ func (s *Server) Run() {
 
 		connectionToClient, e := s.CreateConnection()
 		if e != nil {
-			log.Printf("[%s] failed to create new tcp connection from %s to %s\n", e.Error(), connectionToClient.LocalAddr().String(), GlobalConfig.TCPConnect)
+			log.Printf("[%s] failed to create new tcp connection to %s\n", e.Error(), GlobalConfig.TCPConnect)
 		} else {
 			log.Printf("created new tcp connection from %s to client at %s\n", connectionToClient.LocalAddr().String(), GlobalConfig.TCPConnect)
 
