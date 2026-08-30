@@ -101,9 +101,6 @@ func (c *Client) Run() {
 
 			c.HasActiveConnectionToServer.Store(true)
 
-			var shouldClose atomic.Bool
-			shouldClose.Store(false)
-
 			var wg sync.WaitGroup
 
 			d := time.Minute
@@ -111,40 +108,29 @@ func (c *Client) Run() {
 			var a atomic.Pointer[net.UDPAddr]
 
 			// handle incoming tcp packets from the server
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-
+			wg.Go(func() {
 				b := make([]byte, 1500)
 				var n int
 				var e error
 				var ta *net.UDPAddr
 
 				for {
-					if shouldClose.Load() {
-						return
-					}
-
 					// set read deadline
 					e = connectionToServer.SetReadDeadline(time.Now().Add(d))
 					if e != nil {
-						if !shouldClose.Load() {
-							shouldClose.Store(true)
-							log.Println("failed to set read deadline for tcp connection to server")
-						}
+						log.Println("failed to set read deadline for tcp connection to server")
+						connectionToServer.Close()
 						localListener.Close()
-						return
+						break
 					}
 
 					// read packet from server
 					n, e = connectionToServer.Read(b)
 					if e != nil {
-						if !shouldClose.Load() {
-							shouldClose.Store(true)
-							log.Println("failed to read from tcp connection to server")
-						}
+						log.Println("failed to read from tcp connection to server")
+						connectionToServer.Close()
 						localListener.Close()
-						return
+						break
 					}
 
 					// write packet to local service
@@ -154,52 +140,39 @@ func (c *Client) Run() {
 					}
 					_, e = localListener.WriteToUDP(b[:n], a.Load())
 					if e != nil {
-						if !shouldClose.Load() {
-							shouldClose.Store(true)
-							log.Println("failed to write packet to local udp service")
-						}
+						log.Println("failed to write packet to local udp service")
 						connectionToServer.Close()
-						return
+						localListener.Close()
+						break
 					}
-
 				}
-			}()
+				log.Println("exiting tcp handler go routine")
+			})
 
 			// handle incoming udp packets from local service
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-
+			wg.Go(func() {
 				b := make([]byte, 1500)
 				var n int
 				var e error
 				var ta, ta2 *net.UDPAddr
 
 				for {
-					if shouldClose.Load() {
-						return
-					}
-
 					// set read deadline
 					e = localListener.SetReadDeadline(time.Now().Add(d))
 					if e != nil {
-						if !shouldClose.Load() {
-							shouldClose.Store(true)
-							log.Println("failed to set read deadline for udp connection to local service")
-						}
+						log.Println("failed to set read deadline for udp connection to local service")
 						connectionToServer.Close()
-						return
+						localListener.Close()
+						break
 					}
 
 					// read udp packet from local client
 					n, ta, e = localListener.ReadFromUDP(b)
 					if e != nil {
-						if !shouldClose.Load() {
-							shouldClose.Store(true)
-							log.Println("failed to read packet from local udp service")
-						}
+						log.Println("failed to read packet from local udp service")
 						connectionToServer.Close()
-						return
+						localListener.Close()
+						break
 					}
 
 					// update udp clinet address
@@ -213,15 +186,15 @@ func (c *Client) Run() {
 					// write packet to server
 					_, e = connectionToServer.Write(b[:n])
 					if e != nil {
-						if !shouldClose.Load() {
-							shouldClose.Store(true)
-							log.Println("failed to write packet to tcp connection to server")
-						}
+						log.Println("failed to write packet to tcp connection to server")
+						connectionToServer.Close()
 						localListener.Close()
-						return
+						break
 					}
 				}
-			}()
+
+				log.Println("exiting udp handler go routine")
+			})
 
 			wg.Wait()
 
