@@ -93,106 +93,79 @@ func (s *Server) HandleConnection(connectionToClient *tls.Conn) {
 	// timeout
 	d := time.Minute
 
-	var shouldClose atomic.Bool
-	shouldClose.Store(false)
-
 	var wg sync.WaitGroup
 
 	// handle incoming packets from client
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-
+	wg.Go(func() {
 		b := make([]byte, 1500)
 		var n int
 		var e error
 		for {
-			if shouldClose.Load() {
-				return
-			}
-
 			// set read deadline
 			e = connectionToClient.SetReadDeadline(time.Now().Add(d))
 			if e != nil {
-				if !shouldClose.Load() {
-					shouldClose.Store(true)
-					log.Println("failed to set read deadline for tcp connection to client")
-				}
+				log.Println("failed to set read deadline for tcp connection to client")
 				connectionToLocalService.Close()
-				return
+				connectionToClient.Close()
+				break
 			}
 
 			// read packet from client
 			n, e = connectionToClient.Read(b)
 			if e != nil {
-				if !shouldClose.Load() {
-					shouldClose.Store(true)
-					log.Println("failed to read from tcp connection to client")
-				}
+				log.Println("failed to read from tcp connection to client")
 				connectionToLocalService.Close()
-				return
+				connectionToClient.Close()
+				break
 			}
 
 			// write packet to local service
 			_, e = connectionToLocalService.Write(b[:n])
 			if e != nil {
-				if !shouldClose.Load() {
-					shouldClose.Store(true)
-					log.Println("failed to write packet to local udp service")
-				}
+				log.Println("failed to write packet to local udp service")
+				connectionToLocalService.Close()
 				connectionToClient.Close()
-				return
+				break
 			}
 		}
-	}()
+		log.Println("exiting tcp handler go routine")
+	})
 
 	// handle incoming packets from local service
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-
+	wg.Go(func() {
 		b := make([]byte, 1500)
 		var n int
 		var e error
 		for {
-			if shouldClose.Load() {
-				return
-			}
-
 			// set read deadline
 			e = connectionToLocalService.SetReadDeadline(time.Now().Add(d))
 			if e != nil {
-				if !shouldClose.Load() {
-					shouldClose.Store(true)
-					log.Println("failed to set read deadline for udp connection to local service")
-				}
+				log.Println("failed to set read deadline for udp connection to local service")
 				connectionToClient.Close()
-				return
+				connectionToLocalService.Close()
+				break
 			}
 
 			// read packet from local service
 			n, e = connectionToLocalService.Read(b)
 			if e != nil {
-				if !shouldClose.Load() {
-					shouldClose.Store(true)
-					log.Println("failed to read packet from local udp service")
-				}
+				log.Println("failed to read packet from local udp service")
 				connectionToClient.Close()
-				return
+				connectionToLocalService.Close()
+				break
 			}
 
 			// write packet to client
 			_, e = connectionToClient.Write(b[:n])
 			if e != nil {
-				if !shouldClose.Load() {
-					shouldClose.Store(true)
-					log.Println("failed to write packet to tcp connection to client")
-				}
+				log.Println("failed to write packet to tcp connection to client")
+				connectionToClient.Close()
 				connectionToLocalService.Close()
-				return
+				break
 			}
 		}
-	}()
+		log.Println("exiting udp handler go routine")
+	})
 
 	wg.Wait()
 }
