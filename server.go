@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os/exec"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -90,8 +92,8 @@ func (s *Server) HandleConnection(connectionToClient *tls.Conn) {
 	defer connectionToLocalService.Close()
 	log.Printf("created new udp connection to local service at %s\n", GlobalConfig.UDPConnect)
 
-	// timeout
-	d := time.Minute
+	// read deadline for both connections
+	d := time.Second * 10
 
 	var wg sync.WaitGroup
 
@@ -168,4 +170,15 @@ func (s *Server) HandleConnection(connectionToClient *tls.Conn) {
 	})
 
 	wg.Wait()
+
+	// run post down command
+	if GlobalConfig.ServerPostDown != "" {
+		cmd := strings.Split(GlobalConfig.ServerPostDown, " ")
+		e := exec.Command(cmd[0], cmd[1:]...).Run()
+		if e != nil {
+			log.Printf("failed to run post down script: %s\n", e.Error())
+		} else {
+			log.Printf("ran: %s", GlobalConfig.ServerPostDown)
+		}
+	}
 }

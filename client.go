@@ -11,6 +11,8 @@ import (
 	"math/big"
 	"net"
 	"net/netip"
+	"os/exec"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -103,7 +105,8 @@ func (c *Client) Run() {
 
 			var wg sync.WaitGroup
 
-			d := time.Minute
+			// read deadline for both connections
+			d := time.Second * 10
 
 			var a atomic.Pointer[net.UDPAddr]
 
@@ -201,6 +204,17 @@ func (c *Client) Run() {
 			c.HasActiveConnectionToServer.Store(false)
 
 			localListener.Close()
+
+			// run post down command
+			if GlobalConfig.ClientPostDown != "" {
+				cmd := strings.Split(GlobalConfig.ClientPostDown, " ")
+				e = exec.Command(cmd[0], cmd[1:]...).Run()
+				if e != nil {
+					log.Printf("failed to run post down script: %s\n", e.Error())
+				} else {
+					log.Printf("ran: %s", GlobalConfig.ClientPostDown)
+				}
+			}
 		}
 	}
 }

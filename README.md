@@ -19,6 +19,8 @@ This project provides a solution for tunneling UDP traffic over a TLS connection
   "udpConnect": "local_udp_service_address:port",
   "tcpListen": "server_address:port",
   "udpListen": "local_udp_listen_address:port",
-  "secret": "tls secret"
+  "secret": "tls secret",
+  "clientPostDown": "command",
+  "serverPostDown": "command"
 }
 ```
