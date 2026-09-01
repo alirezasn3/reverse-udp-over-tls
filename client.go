@@ -11,6 +11,7 @@ import (
 	"math/big"
 	"net"
 	"net/netip"
+	"os"
 	"os/exec"
 	"strings"
 	"sync"
@@ -207,8 +208,13 @@ func (c *Client) Run() {
 
 			// run post down command
 			if GlobalConfig.ClientPostDown != "" {
-				cmd := strings.Split(GlobalConfig.ClientPostDown, " ")
-				o, e := exec.Command(cmd[0], cmd[1:]...).CombinedOutput()
+				cmdParts := strings.Split(GlobalConfig.ClientPostDown, " ")
+				cmd := exec.Command(cmdParts[0], cmdParts[1:]...)
+				cmd.Env = append(
+					os.Environ(),
+					GlobalConfig.ClientPostDownEnvironment...,
+				)
+				o, e := cmd.CombinedOutput()
 				if e != nil {
 					log.Printf("failed to run post down script: %s: %s\n", e.Error(), o)
 				} else {

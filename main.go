@@ -15,14 +15,16 @@ var GlobalConfig Config
 var path string
 
 type Config struct {
-	Role           string `json:"role"`
-	TCPConnect     string `json:"tcpConnect"`
-	TCPListen      string `json:"tcpListen"`
-	UDPConnect     string `json:"udpConnect"`
-	UDPListen      string `json:"udpListen"`
-	Secret         string `json:"secret"`
-	ClientPostDown string `json:"clientPostDown"`
-	ServerPostDown string `json:"serverPostDown"`
+	Role                      string   `json:"role"`
+	TCPConnect                string   `json:"tcpConnect"`
+	TCPListen                 string   `json:"tcpListen"`
+	UDPConnect                string   `json:"udpConnect"`
+	UDPListen                 string   `json:"udpListen"`
+	Secret                    string   `json:"secret"`
+	ClientPostDown            string   `json:"clientPostDown"`
+	ServerPostDown            string   `json:"serverPostDown"`
+	ClientPostDownEnvironment []string `json:"clientPostDownEnvironment"`
+	ServerPostDownEnvironment []string `json:"serverPostDownEnvironment"`
 }
 
 // initial setup

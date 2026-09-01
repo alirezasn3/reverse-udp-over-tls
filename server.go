@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
 	"os/exec"
 	"strings"
 	"sync"
@@ -173,8 +174,13 @@ func (s *Server) HandleConnection(connectionToClient *tls.Conn) {
 
 	// run post down command
 	if GlobalConfig.ServerPostDown != "" {
-		cmd := strings.Split(GlobalConfig.ServerPostDown, " ")
-		o, e := exec.Command(cmd[0], cmd[1:]...).CombinedOutput()
+		cmdParts := strings.Split(GlobalConfig.ServerPostDown, " ")
+		cmd := exec.Command(cmdParts[0], cmdParts[1:]...)
+		cmd.Env = append(
+			os.Environ(),
+			GlobalConfig.ServerPostDownEnvironment...,
+		)
+		o, e := cmd.CombinedOutput()
 		if e != nil {
 			log.Printf("failed to run post down script: %s: %s\n", e.Error(), o)
 		} else {
