@@ -221,6 +221,8 @@ func (c *Client) Run() {
 					log.Println(string(o))
 				}
 			}
+
+			log.Printf("listening on %s for tcp connections from the server...\n", GlobalConfig.TCPListen)
 		}
 	}
 }
