@@ -210,7 +210,7 @@ func (c *Client) Run() {
 				cmd := strings.Split(GlobalConfig.ClientPostDown, " ")
 				o, e := exec.Command(cmd[0], cmd[1:]...).CombinedOutput()
 				if e != nil {
-					log.Printf("failed to run post down script: %s\n", e.Error())
+					log.Printf("failed to run post down script: %s: %s\n", e.Error(), o)
 				} else {
 					log.Println(string(o))
 				}
