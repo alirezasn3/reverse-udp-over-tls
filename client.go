@@ -208,11 +208,11 @@ func (c *Client) Run() {
 			// run post down command
 			if GlobalConfig.ClientPostDown != "" {
 				cmd := strings.Split(GlobalConfig.ClientPostDown, " ")
-				e = exec.Command(cmd[0], cmd[1:]...).Run()
+				o, e := exec.Command(cmd[0], cmd[1:]...).CombinedOutput()
 				if e != nil {
 					log.Printf("failed to run post down script: %s\n", e.Error())
 				} else {
-					log.Printf("ran: %s", GlobalConfig.ClientPostDown)
+					log.Println(string(o))
 				}
 			}
 		}

@@ -174,11 +174,11 @@ func (s *Server) HandleConnection(connectionToClient *tls.Conn) {
 	// run post down command
 	if GlobalConfig.ServerPostDown != "" {
 		cmd := strings.Split(GlobalConfig.ServerPostDown, " ")
-		e := exec.Command(cmd[0], cmd[1:]...).Run()
+		o, e := exec.Command(cmd[0], cmd[1:]...).CombinedOutput()
 		if e != nil {
 			log.Printf("failed to run post down script: %s\n", e.Error())
 		} else {
-			log.Printf("ran: %s", GlobalConfig.ServerPostDown)
+			log.Println(string(o))
 		}
 	}
 }
